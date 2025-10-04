@@ -4,9 +4,15 @@ import cv2, mediapipe as mp, numpy as np
 
 # ---------------- Config (tune if needed) ----------------
 BROW_BASELINE_FRAMES = 60   # frames to learn neutral brow distance
-BROW_UP_FACTOR = 0.20       # % above baseline to count as "up" (e.g., 0.20 = 20%)
+BROW_UP_FACTOR = 0.12       # lowered: easier to trigger brow_up
 MOUTH_OPEN_THRESH = 0.38    # mouth-aspect-ratio threshold for open/close
 SEND_FPS = 30               # UDP send rate
+
+# Blink tuning (more sensitive)
+BLINK_EAR_THRESH = 0.22     # raised a bit so blinks register sooner
+BLINK_MIN_FRAMES = 1        # count blink if eyes closed for >= 1 frame
+DOUBLE_BLINK_WINDOW = 0.6   # seconds between two blinks to count as double
+DOUBLE_BLINK_HOLD = 0.2     # seconds to hold the output flag = True
 
 # MediaPipe FaceMesh
 mp_face_mesh = mp.solutions.face_mesh
@@ -20,6 +26,11 @@ L_BROW = 105
 L_EYE_TOP = 159
 # Inter-ocular normalization references
 L_EYE_IN, R_EYE_IN = 133, 362
+# Eyes
+L_EYE_OUT, L_EYE_INNER = 33, 133
+R_EYE_OUT, R_EYE_INNER = 263, 362
+L_EYE_UP,  L_EYE_DN = 159, 145
+R_EYE_UP,  R_EYE_DN = 386, 374
 
 def dist(a, b): 
     return float(np.linalg.norm(a - b))
@@ -30,6 +41,11 @@ def mouth_aspect_ratio(lm):
     horiz = dist(L, R) + 1e-6
     vert = dist(U, D)
     return vert / horiz
+
+def eye_aspect_ratio(lm, up, dn, inn, outn):
+    vertical = dist(lm[up], lm[dn])
+    horiz = dist(lm[inn], lm[outn]) + 1e-6
+    return vertical / horiz
 
 def main():
     ap = argparse.ArgumentParser()
@@ -62,6 +78,13 @@ def main():
     brow_samples = deque(maxlen=BROW_BASELINE_FRAMES)
     brow_baseline = None
 
+    # Blink state
+    l_run = 0
+    r_run = 0
+    blink_active = False              # current blink state (closed)
+    blink_times = deque(maxlen=4)     # recent blink "edges" (open->closed) times
+    double_blink_until = 0.0          # hold-true timer
+
     last_send = 0
     w = h = 0
 
@@ -76,6 +99,7 @@ def main():
 
         mouth_open = False
         brow_up = False
+        double_blink = False
 
         if res.multi_face_landmarks:
             lm = np.array([[p.x * w, p.y * h] for p in res.multi_face_landmarks[0].landmark], dtype=np.float32)
@@ -85,7 +109,6 @@ def main():
             mouth_open = mar > MOUTH_OPEN_THRESH
 
             # ----- Eyebrow up/down (relative to baseline) -----
-            # Normalize brow distance by inter-ocular width for scale invariance
             brow_dist = dist(lm[L_BROW], lm[L_EYE_TOP])
             inter_ocular = dist(lm[L_EYE_IN], lm[R_EYE_IN]) + 1e-6
             brow_norm = brow_dist / inter_ocular
@@ -95,26 +118,61 @@ def main():
                 if len(brow_samples) == brow_samples.maxlen:
                     brow_baseline = float(np.median(brow_samples))
             else:
-                # up if current distance is >= (1 + factor) * baseline
                 brow_up = brow_norm >= (brow_baseline * (1.0 + BROW_UP_FACTOR))
 
+            # ----- Blink detection (more sensitive double-blink) -----
+            l_ear = eye_aspect_ratio(lm, L_EYE_UP, L_EYE_DN, L_EYE_INNER, L_EYE_OUT)
+            r_ear = eye_aspect_ratio(lm, R_EYE_UP, R_EYE_DN, R_EYE_INNER, R_EYE_OUT)
+
+            if l_ear < BLINK_EAR_THRESH:
+                l_run += 1
+            else:
+                l_run = 0
+            if r_ear < BLINK_EAR_THRESH:
+                r_run += 1
+            else:
+                r_run = 0
+
+            is_blink = (l_run >= BLINK_MIN_FRAMES) and (r_run >= BLINK_MIN_FRAMES)
+
+            # Detect the blink "edge" (transition open -> closed)
+            if is_blink and not blink_active:
+                t = time.time()
+                blink_times.append(t)
+                # Check last two edges within window
+                if len(blink_times) >= 2:
+                    if (blink_times[-1] - blink_times[-2]) <= DOUBLE_BLINK_WINDOW:
+                        double_blink_until = t + DOUBLE_BLINK_HOLD
+                blink_active = True
+            # Reset active flag when eyes open again
+            if not is_blink and blink_active:
+                blink_active = False
+
+            # Output flag held briefly so receiver can catch it
+            if time.time() < double_blink_until:
+                double_blink = True
+
             if args.show:
-                cv2.putText(frame, f"MouthOpen:{mouth_open}  (MAR {mar:.2f})", (10, 28),
+                cv2.putText(frame, f"MouthOpen:{mouth_open} (MAR {mar:.2f})", (10, 28),
                             cv2.FONT_HERSHEY_SIMPLEX, 0.7, (0,200,255), 2)
                 if brow_baseline is None:
                     cv2.putText(frame, "Brow baseline calibrating...", (10, 52),
                                 cv2.FONT_HERSHEY_SIMPLEX, 0.7, (50,200,50), 2)
                 else:
-                    cv2.putText(frame, f"BrowUp:{brow_up}  (norm {brow_norm:.2f} / base {brow_baseline:.2f})", (10, 52),
+                    cv2.putText(frame, f"BrowUp:{brow_up}", (10, 52),
                                 cv2.FONT_HERSHEY_SIMPLEX, 0.7, (0,200,255), 2)
+                cv2.putText(frame, f"DoubleBlink:{double_blink}", (10, 76),
+                            cv2.FONT_HERSHEY_SIMPLEX, 0.7, (200,200,0), 2)
         else:
+            l_run = 0
+            r_run = 0
             if args.show:
                 cv2.putText(frame, "No face", (10, 28), cv2.FONT_HERSHEY_SIMPLEX, 0.7, (0,0,255), 2)
 
         # ----- Send JSON at ~SEND_FPS -----
         now = time.time()
         if now - last_send >= 1.0 / SEND_FPS:
-            payload = {"mouth_open": bool(mouth_open), "brow_up": bool(brow_up)}
+            payload = {"mouth_open": bool(mouth_open), "brow_up": bool(brow_up), "double_blink": bool(double_blink)}
             try:
                 sock.sendto(json.dumps(payload).encode("utf-8"), (args.host, args.port))
             except OSError:
