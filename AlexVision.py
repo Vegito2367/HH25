@@ -8,17 +8,27 @@ import time
 from pathlib import Path
 import asyncio
 import websockets
+from collections import deque
 
 # ============================================================================
 # DEFAULTS (editable at runtime)
 # ============================================================================
-VMAX_X = 300.0          # px/s - REDUCED to 300
-VMAX_Y = 300.0          # px/s - REDUCED to 300
+VMAX_X = 300.0          # px/s
+VMAX_Y = 300.0          # px/s
 DEADZONE_YAW = 10.0     # degrees - X axis deadzone
 DEADZONE_ROLL = 10.0    # degrees - Y axis deadzone
 HYSTERESIS_DEG = 1.0    # small hysteresis to prevent chatter
 TAU_VEL = 0.18          # velocity slew time constant (seconds)
-YAW_SMOOTHING = 0.7     # Smoothing factor for yaw (0-1, higher = more smoothing)
+YAW_SMOOTHING = 0.3     # Smoothing factor for yaw (0-1, higher = more smoothing)
+
+# Face gesture detection config
+BROW_BASELINE_FRAMES = 60   # frames to learn neutral brow distance
+BROW_UP_FACTOR = 0.12       # lowered: easier to trigger brow_up
+MOUTH_OPEN_THRESH = 0.38    # mouth-aspect-ratio threshold for open/close
+BLINK_EAR_THRESH = 0.22     # raised a bit so blinks register sooner
+BLINK_MIN_FRAMES = 1        # count blink if eyes closed for >= 1 frame
+DOUBLE_BLINK_WINDOW = 0.6   # seconds between two blinks to count as double
+DOUBLE_BLINK_HOLD = 0.2     # seconds to hold the output flag = True
 
 CALIB_FILE = "simple_head_calib.json"
 
@@ -29,8 +39,15 @@ L_EYE_IN = 133
 R_EYE_IN = 362
 NOSE_TIP = 1
 NOSE_BRIDGE = 6
-MOUTH_L = 61
-MOUTH_R = 291
+
+# Face gesture landmarks
+MOUTH_L, MOUTH_R = 61, 291
+MOUTH_UP, MOUTH_DN = 13, 14
+L_BROW = 105
+L_EYE_TOP = 159
+L_EYE_UP, L_EYE_DN = 159, 145
+R_EYE_UP, R_EYE_DN = 386, 374
+L_EYE_INNER, R_EYE_INNER = 133, 362
 
 # WebSocket configuration
 WS_HOST = 'localhost'
@@ -39,6 +56,9 @@ WS_UPDATE_RATE = 0.03  # Send updates every 30ms (~33 FPS)
 
 # Global variable to store connected WebSocket clients
 connected_clients = set()
+
+# Global flag for shutdown
+shutdown_flag = False
 
 # ============================================================================
 # HELPER FUNCTIONS
@@ -83,67 +103,75 @@ def initialize_camera():
     return None, None
 
 
-def estimate_yaw_with_pnp(landmarks, frame_shape):
+def dist(a, b): 
+    return float(np.linalg.norm(a - b))
+
+
+def mouth_aspect_ratio(lm, w, h):
+    """Calculate mouth aspect ratio for open/close detection."""
+    L = np.array([lm[MOUTH_L].x * w, lm[MOUTH_L].y * h])
+    R = np.array([lm[MOUTH_R].x * w, lm[MOUTH_R].y * h])
+    U = np.array([lm[MOUTH_UP].x * w, lm[MOUTH_UP].y * h])
+    D = np.array([lm[MOUTH_DN].x * w, lm[MOUTH_DN].y * h])
+    horiz = dist(L, R) + 1e-6
+    vert = dist(U, D)
+    return vert / horiz
+
+
+def eye_aspect_ratio(lm, up, dn, inn, outn, w, h):
+    """Calculate eye aspect ratio for blink detection."""
+    vertical = dist(
+        np.array([lm[up].x * w, lm[up].y * h]),
+        np.array([lm[dn].x * w, lm[dn].y * h])
+    )
+    horiz = dist(
+        np.array([lm[inn].x * w, lm[inn].y * h]),
+        np.array([lm[outn].x * w, lm[outn].y * h])
+    ) + 1e-6
+    return vertical / horiz
+
+
+def estimate_yaw_geometric(landmarks, frame_shape):
     """
-    Estimate yaw angle using cv2.solvePnP.
-    Returns yaw in degrees or None if estimation fails.
+    Estimate yaw using geometric method: nose position relative to eyes.
+    This is much more robust than solvePnP.
+    Returns yaw in arbitrary units (not degrees, but proportional to head turn).
     """
-    h, w = frame_shape[:2]
-    
-    # Build simple intrinsic matrix
-    fx = fy = w
-    cx, cy = w / 2, h / 2
-    camera_matrix = np.array([
-        [fx, 0, cx],
-        [0, fy, cy],
-        [0, 0, 1]
-    ], dtype=float)
-    dist_coeffs = np.zeros(4)
-    
-    # 3D canonical model (approximate face landmarks in cm)
-    model_points = np.array([
-        (0.0, 0.0, 0.0),        # Nose tip
-        (0.0, 3.0, -2.0),       # Nose bridge
-        (-4.0, 1.0, -1.0),      # Left eye outer
-        (4.0, 1.0, -1.0),       # Right eye outer
-        (-2.5, 1.5, -1.0),      # Left eye inner
-        (2.5, 1.5, -1.0),       # Right eye inner
-        (-3.0, -3.0, -1.0),     # Left mouth corner
-        (3.0, -3.0, -1.0),      # Right mouth corner
-    ], dtype=float)
-    
-    # Corresponding 2D image points
-    indices = [NOSE_TIP, NOSE_BRIDGE, L_EYE_OUT, R_EYE_OUT, 
-               L_EYE_IN, R_EYE_IN, MOUTH_L, MOUTH_R]
-    
     try:
-        image_points = []
-        for idx in indices:
-            lm = landmarks[idx]
-            image_points.append([lm.x * w, lm.y * h])
-        image_points = np.array(image_points, dtype=float)
+        h, w = frame_shape[:2]
         
-        # Use regular solvePnP
-        success, rvec, tvec = cv2.solvePnP(
-            model_points, image_points, camera_matrix, dist_coeffs,
-            flags=cv2.SOLVEPNP_ITERATIVE
-        )
+        # Get eye positions
+        l_eye = landmarks[L_EYE_OUT]
+        r_eye = landmarks[R_EYE_OUT]
+        nose = landmarks[NOSE_TIP]
         
-        if not success or rvec is None:
+        # Convert to pixel coordinates
+        l_eye_x = l_eye.x * w
+        r_eye_x = r_eye.x * w
+        nose_x = nose.x * w
+        
+        # Calculate eye center
+        eye_center_x = (l_eye_x + r_eye_x) / 2.0
+        
+        # Calculate eye width (distance between eyes)
+        eye_width = abs(r_eye_x - l_eye_x)
+        
+        if eye_width < 10:  # Too small, probably bad detection
             return None
         
-        # Convert rotation vector to matrix
-        rmat, _ = cv2.Rodrigues(rvec)
+        # Calculate nose offset from eye center, normalized by eye width
+        # This gives a ratio that's approximately proportional to yaw angle
+        nose_offset = nose_x - eye_center_x
+        yaw_ratio = nose_offset / eye_width
         
-        # Extract yaw (rotation around Y-axis in camera frame)
-        yaw_rad = np.arctan2(rmat[0, 2], rmat[2, 2])
-        yaw_deg = np.degrees(yaw_rad)
+        # Convert to pseudo-degrees (scale by 50 to get reasonable range)
+        yaw_deg = yaw_ratio * 50.0
         
-        # Reject extreme values
-        if abs(yaw_deg) > 100:
-            return None
+        # Clamp to reasonable range
+        yaw_deg = np.clip(yaw_deg, -60, 60)
         
         return yaw_deg
+        
     except Exception as e:
         return None
 
@@ -222,7 +250,7 @@ def run_calibration(cap, frame_shape):
             current_roll = None
             if results.multi_face_landmarks:
                 landmarks = results.multi_face_landmarks[0].landmark
-                current_yaw = estimate_yaw_with_pnp(landmarks, frame.shape)
+                current_yaw = estimate_yaw_geometric(landmarks, frame.shape)
                 current_roll = roll_from_eyes(landmarks, frame.shape)
             
             # Display instruction
@@ -245,7 +273,7 @@ def run_calibration(cap, frame_shape):
             if k == ord(' '):
                 break
         
-        # Collect samples for ~1.5 seconds (longer for better median)
+        # Collect samples for ~1.5 seconds
         start_time = time.time()
         while time.time() - start_time < 1.5:
             ret, frame = cap.read()
@@ -257,7 +285,7 @@ def run_calibration(cap, frame_shape):
             
             if results.multi_face_landmarks:
                 landmarks = results.multi_face_landmarks[0].landmark
-                yaw = estimate_yaw_with_pnp(landmarks, frame.shape)
+                yaw = estimate_yaw_geometric(landmarks, frame.shape)
                 roll = roll_from_eyes(landmarks, frame.shape)
                 
                 if yaw is not None:
@@ -266,21 +294,22 @@ def run_calibration(cap, frame_shape):
                     samples_roll.append(roll)
             
             # Show collecting
-            elapsed = time.time() - start_time
             cv2.putText(frame, f"Collecting... {len(samples_yaw)} samples", 
                        (50, h//2), cv2.FONT_HERSHEY_SIMPLEX, 1, (0, 255, 0), 2)
             cv2.imshow("Head Cursor", frame)
             cv2.waitKey(1)
         
         # Store median
-        if len(samples_yaw) > 0:
+        if len(samples_yaw) > 5:
             calib[f"{key}_yaw"] = float(np.median(samples_yaw))
         else:
+            print(f"  WARNING: Only {len(samples_yaw)} yaw samples - using 0.0")
             calib[f"{key}_yaw"] = 0.0
             
-        if len(samples_roll) > 0:
+        if len(samples_roll) > 5:
             calib[f"{key}_roll"] = float(np.median(samples_roll))
         else:
+            print(f"  WARNING: Only {len(samples_roll)} roll samples - using 0.0")
             calib[f"{key}_roll"] = 0.0
         
         print(f"  Collected {len(samples_yaw)} yaw, {len(samples_roll)} roll samples")
@@ -302,13 +331,13 @@ def run_calibration(cap, frame_shape):
     
     calib["rom_yaw"] = rom_yaw
     calib["rom_roll"] = rom_roll
-    calib["deadzone_yaw"] = max(5.0, 0.15 * rom_yaw)
+    calib["deadzone_yaw"] = max(2.0, 0.15 * rom_yaw)  # Lower minimum deadzone
     calib["deadzone_roll"] = max(5.0, 0.15 * rom_roll)
     
     print("\n[CALIBRATION COMPLETE]")
-    print(f"  Neutral: yaw={yaw0:.1f}°, roll={roll0:.1f}°")
-    print(f"  ROM: yaw={rom_yaw:.1f}°, roll={rom_roll:.1f}°")
-    print(f"  Auto deadzone: yaw={calib['deadzone_yaw']:.2f}° roll={calib['deadzone_roll']:.2f}°")
+    print(f"  Neutral: yaw={yaw0:.1f}, roll={roll0:.1f}°")
+    print(f"  ROM: yaw={rom_yaw:.1f}, roll={rom_roll:.1f}°")
+    print(f"  Auto deadzone: yaw={calib['deadzone_yaw']:.2f} roll={calib['deadzone_roll']:.2f}°")
     
     return calib
 
@@ -329,14 +358,14 @@ def update_velocity_constant(dyaw, droll, params, v_cmd_prev, dt):
     v_target_x = 0.0
     v_target_y = 0.0
     
-    # X-axis (yaw) - INVERTED
+    # X-axis (yaw) - NO LONGER INVERTED
     if abs(dyaw) > deadzone_yaw + hysteresis:
-        v_target_x = -vmax_x * np.sign(dyaw)
+        v_target_x = vmax_x * np.sign(dyaw)  # REMOVED NEGATIVE SIGN
     elif abs(dyaw) < deadzone_yaw:
         v_target_x = 0.0
     else:
         if abs(v_cmd_prev[0]) > 1e-3:
-            v_target_x = -vmax_x * np.sign(v_cmd_prev[0])
+            v_target_x = vmax_x * np.sign(v_cmd_prev[0])  # REMOVED NEGATIVE SIGN
     
     # Y-axis (roll)
     if abs(droll) > deadzone_roll + hysteresis:
@@ -370,7 +399,7 @@ async def handle_client(websocket):
         print(f"Client disconnected. Total clients: {len(connected_clients)}")
 
 
-async def broadcast_cursor_position(x_percent, y_percent):
+async def broadcast_cursor(x_percent, y_percent):
     """Send cursor position to all connected clients."""
     if not connected_clients:
         return
@@ -394,11 +423,36 @@ async def broadcast_cursor_position(x_percent, y_percent):
         connected_clients.discard(client)
 
 
+async def broadcast_command(command_name):
+    """Send a simple command to all connected clients."""
+    if not connected_clients:
+        return
+    
+    command = {"command": command_name}
+    
+    # Send to all connected clients
+    disconnected = set()
+    for client in connected_clients:
+        try:
+            await client.send(json.dumps(command))
+        except websockets.exceptions.ConnectionClosed:
+            disconnected.add(client)
+    
+    # Remove disconnected clients
+    for client in disconnected:
+        connected_clients.discard(client)
+
+
 async def websocket_server():
     """Start the WebSocket server."""
+    global shutdown_flag
     print(f"Starting WebSocket server on ws://{WS_HOST}:{WS_PORT}")
+    
     async with websockets.serve(handle_client, WS_HOST, WS_PORT):
-        await asyncio.Future()  # run forever
+        # Wait until shutdown flag is set
+        while not shutdown_flag:
+            await asyncio.sleep(0.1)
+        print("WebSocket server shutting down...")
 
 
 # ============================================================================
@@ -407,6 +461,8 @@ async def websocket_server():
 
 async def main_loop():
     """Main head tracking loop that runs alongside WebSocket server."""
+    global shutdown_flag
+    
     # Initialize webcam
     cap, frame = initialize_camera()
     
@@ -416,6 +472,7 @@ async def main_loop():
         print("  1. Check if another app is using the camera")
         print("  2. Grant camera permissions in System Preferences > Security & Privacy")
         print("  3. Try restarting your computer")
+        shutdown_flag = True
         return
     
     h, w = frame.shape[:2]
@@ -441,11 +498,23 @@ async def main_loop():
     cursor_x, cursor_y = w / 2, h / 2
     v_cmd = [0.0, 0.0]
     
-    # PERSISTENT values - with SMOOTHING to prevent jumps
-    last_valid_yaw = 0.0
-    last_valid_roll = 0.0
-    smoothed_yaw = 0.0
-    smoothed_roll = 0.0
+    # Initialize to None so first detection sets the value
+    smoothed_yaw = None
+    smoothed_roll = None
+    
+    # Face gesture state
+    brow_samples = deque(maxlen=BROW_BASELINE_FRAMES)
+    brow_baseline = None
+    l_run = 0
+    r_run = 0
+    blink_active = False
+    blink_times = deque(maxlen=4)
+    double_blink_until = 0.0
+    
+    # Previous states for edge detection
+    prev_mouth_open = False
+    prev_brow_up = False
+    prev_double_blink = False
     
     params = {
         "vmax_x": VMAX_X,
@@ -464,13 +533,17 @@ async def main_loop():
     prev_time = time.time()
     last_ws_send = time.time()
     
-    print("\n=== HEAD CURSOR CONTROL ===")
+    print("\n=== HEAD CURSOR + FACE GESTURES CONTROL ===")
     print("✓ Camera initialized successfully!")
-    print("\nCONTROLS:")
-    print("  - Turn head LEFT → cursor moves RIGHT (INVERTED)")
-    print("  - Turn head RIGHT → cursor moves LEFT (INVERTED)")
+    print("✓ Using robust geometric yaw estimation")
+    print("\nHEAD CONTROLS:")
+    print("  - Turn head LEFT → cursor moves LEFT")
+    print("  - Turn head RIGHT → cursor moves RIGHT")
     print("  - Tilt head (ear to shoulder) → cursor moves up/down")
-    print("  - Speed: 300 px/s with 10° deadzone")
+    print("\nFACE GESTURES:")
+    print("  - Mouth open/close detection")
+    print("  - Eyebrow raise detection")
+    print("  - Double blink detection")
     print("\nKEYS:")
     print("  'c' - Calibrate (4 directions + neutral)")
     print("  's' / 'l' - Save / load calibration")
@@ -480,10 +553,10 @@ async def main_loop():
     print("  ',' / '.' - Decrease / increase roll deadzone")
     print("  'q' or ESC - Quit\n")
     print(f"\nWebSocket server running on ws://{WS_HOST}:{WS_PORT}")
-    print(f"Waiting for Godot client to connect...\n")
+    print(f"Broadcasting: cursor position + face gestures\n")
     
     try:
-        while True:
+        while not shutdown_flag:
             ret, frame = cap.read()
             if not ret:
                 print("Warning: Failed to read frame, retrying...")
@@ -505,10 +578,15 @@ async def main_loop():
                 fps_counter = 0
                 fps_time = current_time
             
-            # Initialize with smoothed values
-            yaw = smoothed_yaw
-            roll = smoothed_roll
+            # Initialize with smoothed values (or 0 if None)
+            yaw = smoothed_yaw if smoothed_yaw is not None else 0.0
+            roll = smoothed_roll if smoothed_roll is not None else 0.0
             dyaw, droll = 0, 0
+            
+            # Face gesture states
+            mouth_open = False
+            brow_up = False
+            double_blink = False
             
             # Process face
             rgb = cv2.cvtColor(frame, cv2.COLOR_BGR2RGB)
@@ -527,25 +605,78 @@ async def main_loop():
                 )
                 
                 # Estimate head pose
-                yaw_new = estimate_yaw_with_pnp(landmarks, frame.shape)
+                yaw_new = estimate_yaw_geometric(landmarks, frame.shape)
                 roll_new = roll_from_eyes(landmarks, frame.shape)
                 
-                # Update with SMOOTHING to prevent wild jumps
+                # Update with smoothing
                 if yaw_new is not None:
-                    # Reject absurd frame-to-frame changes (>60° jump likely error)
-                    if abs(yaw_new - smoothed_yaw) < 60:
-                        # Exponential moving average
+                    if smoothed_yaw is None:
+                        smoothed_yaw = yaw_new
+                    else:
                         smoothed_yaw = YAW_SMOOTHING * smoothed_yaw + (1 - YAW_SMOOTHING) * yaw_new
-                        last_valid_yaw = smoothed_yaw
                     yaw = smoothed_yaw
                 
                 if roll_new is not None:
-                    smoothed_roll = 0.5 * smoothed_roll + 0.5 * roll_new
-                    last_valid_roll = smoothed_roll
+                    if smoothed_roll is None:
+                        smoothed_roll = roll_new
+                    else:
+                        smoothed_roll = 0.5 * smoothed_roll + 0.5 * roll_new
                     roll = smoothed_roll
                 
+                # ----- Face Gesture Detection -----
+                
+                # Mouth open/close
+                mar = mouth_aspect_ratio(landmarks, w, h)
+                mouth_open = mar > MOUTH_OPEN_THRESH
+                
+                # Eyebrow up/down
+                brow_pt = np.array([landmarks[L_BROW].x * w, landmarks[L_BROW].y * h])
+                eye_top_pt = np.array([landmarks[L_EYE_TOP].x * w, landmarks[L_EYE_TOP].y * h])
+                brow_dist = dist(brow_pt, eye_top_pt)
+                
+                l_eye_in = np.array([landmarks[L_EYE_IN].x * w, landmarks[L_EYE_IN].y * h])
+                r_eye_in = np.array([landmarks[R_EYE_IN].x * w, landmarks[R_EYE_IN].y * h])
+                inter_ocular = dist(l_eye_in, r_eye_in) + 1e-6
+                brow_norm = brow_dist / inter_ocular
+                
+                if brow_baseline is None:
+                    brow_samples.append(brow_norm)
+                    if len(brow_samples) == brow_samples.maxlen:
+                        brow_baseline = float(np.median(brow_samples))
+                else:
+                    brow_up = brow_norm >= (brow_baseline * (1.0 + BROW_UP_FACTOR))
+                
+                # Blink detection
+                l_ear = eye_aspect_ratio(landmarks, L_EYE_UP, L_EYE_DN, L_EYE_INNER, L_EYE_OUT, w, h)
+                r_ear = eye_aspect_ratio(landmarks, R_EYE_UP, R_EYE_DN, R_EYE_INNER, R_EYE_OUT, w, h)
+                
+                if l_ear < BLINK_EAR_THRESH:
+                    l_run += 1
+                else:
+                    l_run = 0
+                if r_ear < BLINK_EAR_THRESH:
+                    r_run += 1
+                else:
+                    r_run = 0
+                
+                is_blink = (l_run >= BLINK_MIN_FRAMES) and (r_run >= BLINK_MIN_FRAMES)
+                
+                if is_blink and not blink_active:
+                    t = time.time()
+                    blink_times.append(t)
+                    if len(blink_times) >= 2:
+                        if (blink_times[-1] - blink_times[-2]) <= DOUBLE_BLINK_WINDOW:
+                            double_blink_until = t + DOUBLE_BLINK_HOLD
+                    blink_active = True
+                
+                if not is_blink and blink_active:
+                    blink_active = False
+                
+                if time.time() < double_blink_until:
+                    double_blink = True
+                
                 # Update cursor if calibrated
-                if calib is not None:
+                if calib is not None and smoothed_yaw is not None:
                     yaw0 = calib.get("neutral_yaw", 0)
                     roll0 = calib.get("neutral_roll", 0)
                     
@@ -570,16 +701,40 @@ async def main_loop():
                     # Clamp to window
                     cursor_x = np.clip(cursor_x, 0, w - 1)
                     cursor_y = np.clip(cursor_y, 0, h - 1)
+                else:
+                    v_cmd = [0.0, 0.0]
+            else:
+                # No face detected
+                v_cmd = [0.0, 0.0]
+                l_run = 0
+                r_run = 0
             
             # Send cursor position via WebSocket at regular intervals
             if current_time - last_ws_send >= WS_UPDATE_RATE:
-                # Convert to percentages (0-100)
                 x_percent = (cursor_x / w) * 100.0
                 y_percent = (cursor_y / h) * 100.0
                 
-                # Broadcast to all clients
-                await broadcast_cursor_position(x_percent, y_percent)
+                await broadcast_cursor(x_percent, y_percent)
                 last_ws_send = current_time
+            
+            # Send face gesture commands when state changes
+            if mouth_open != prev_mouth_open:
+                if mouth_open:
+                    await broadcast_command("mouth_open")
+                else:
+                    await broadcast_command("mouth_close")
+                prev_mouth_open = mouth_open
+            
+            if brow_up != prev_brow_up:
+                if brow_up:
+                    await broadcast_command("brow_up")
+                else:
+                    await broadcast_command("brow_down")
+                prev_brow_up = brow_up
+            
+            if double_blink and not prev_double_blink:
+                await broadcast_command("double_blink")
+            prev_double_blink = double_blink
             
             # Draw deadzone indicator
             cv2.circle(frame, (w//2, h//2), 60, (80, 80, 80), 2)
@@ -605,13 +760,14 @@ async def main_loop():
             y_percent = (cursor_y / h) * 100.0
             hud_lines = [
                 f"FPS: {fps}",
-                f"Yaw: {yaw:.1f}° (d: {dyaw:+.1f}°)",
+                f"Yaw: {yaw:.1f} (d: {dyaw:+.1f})",
                 f"Roll: {roll:.1f}° (d: {droll:+.1f}°)",
                 f"Speed: {params['vmax_x']:.0f} px/s",
-                f"Deadzone: Yaw={params['deadzone_yaw']:.1f}° Roll={params['deadzone_roll']:.1f}°",
+                f"Deadzone: Yaw={params['deadzone_yaw']:.1f} Roll={params['deadzone_roll']:.1f}°",
                 f"Velocity: ({v_cmd[0]:+.0f}, {v_cmd[1]:+.0f}) px/s",
                 f"Cursor: ({cursor_x:.0f}, {cursor_y:.0f}) = ({x_percent:.1f}%, {y_percent:.1f}%)",
-                f"Calib: {'YES' if calib else 'NO - Press C'}",
+                f"Mouth: {mouth_open} | Brow: {brow_up} | Blink2x: {double_blink}",
+                f"Calib: {'YES' if calib else 'NO - Press C'} | Brow: {'SET' if brow_baseline else 'LEARNING'}",
                 f"WS Clients: {len(connected_clients)}",
             ]
             
@@ -625,9 +781,9 @@ async def main_loop():
             status_text = []
             if calib:
                 if abs(dyaw) > params["deadzone_yaw"]:
-                    status_text.append(f"MOVING X: {'LEFT' if dyaw > 0 else 'RIGHT'}")
+                    status_text.append(f"MOVING X: {'RIGHT' if dyaw > 0 else 'LEFT'}")
                 if abs(droll) > params["deadzone_roll"]:
-                    status_text.append(f"MOVING Y: {'DOWN' if droll > 0 else 'UP'}")
+                    status_text.append(f"MOVING Y: {'UP' if droll > 0 else 'DOWN'}")
                 if not status_text:
                     status_text.append("IN DEADZONE - STOPPED")
             else:
@@ -644,13 +800,15 @@ async def main_loop():
             key = cv2.waitKey(1) & 0xFF
             
             if key == ord('q') or key == 27:
+                print("\n[ESC/Q pressed - shutting down...]")
+                shutdown_flag = True
                 break
             elif key == ord('c'):
                 print("\n[Starting 4-direction calibration...]")
+                print("TIP: Keep your head at a normal distance from camera")
                 new_calib = run_calibration(cap, (h, w))
                 if new_calib is not None:
                     calib = new_calib
-                    # Reset smoothing after calibration
                     smoothed_yaw = calib.get("neutral_yaw", 0)
                     smoothed_roll = calib.get("neutral_roll", 0)
             elif key == ord('s'):
@@ -665,11 +823,15 @@ async def main_loop():
                     with open(CALIB_FILE, 'r') as f:
                         calib = json.load(f)
                     print(f"\n[Calibration loaded]")
+                    if smoothed_yaw is None:
+                        smoothed_yaw = calib.get("neutral_yaw", 0)
+                    if smoothed_roll is None:
+                        smoothed_roll = calib.get("neutral_roll", 0)
             elif key == ord('r'):
-                if calib:
+                if calib and smoothed_yaw is not None and smoothed_roll is not None:
                     calib["neutral_yaw"] = smoothed_yaw
                     calib["neutral_roll"] = smoothed_roll
-                    print(f"\n[Recentered: yaw={smoothed_yaw:.1f}°, roll={smoothed_roll:.1f}°]")
+                    print(f"\n[Recentered: yaw={smoothed_yaw:.1f}, roll={smoothed_roll:.1f}°]")
             elif key == ord('['):
                 params["vmax_x"] = max(100, params["vmax_x"] - 50)
                 params["vmax_y"] = params["vmax_x"]
@@ -679,11 +841,11 @@ async def main_loop():
                 params["vmax_y"] = params["vmax_x"]
                 print(f"\n[Speed: {params['vmax_x']:.0f} px/s]")
             elif key == ord('-'):
-                params["deadzone_yaw"] = max(1.0, params["deadzone_yaw"] - 1.0)
-                print(f"\n[Yaw Deadzone: {params['deadzone_yaw']:.1f}°]")
+                params["deadzone_yaw"] = max(0.5, params["deadzone_yaw"] - 0.5)
+                print(f"\n[Yaw Deadzone: {params['deadzone_yaw']:.1f}]")
             elif key == ord('='):
-                params["deadzone_yaw"] = min(30, params["deadzone_yaw"] + 1.0)
-                print(f"\n[Yaw Deadzone: {params['deadzone_yaw']:.1f}°]")
+                params["deadzone_yaw"] = min(30, params["deadzone_yaw"] + 0.5)
+                print(f"\n[Yaw Deadzone: {params['deadzone_yaw']:.1f}]")
             elif key == ord(','):
                 params["deadzone_roll"] = max(1.0, params["deadzone_roll"] - 1.0)
                 print(f"\n[Roll Deadzone: {params['deadzone_roll']:.1f}°]")
@@ -695,19 +857,34 @@ async def main_loop():
             await asyncio.sleep(0.001)
     
     finally:
+        print("[Cleaning up camera and windows...]")
         face_mesh.close()
         cap.release()
         cv2.destroyAllWindows()
-        print("\n[Exiting...]")
+        cv2.waitKey(1)
+        shutdown_flag = True
+        print("[Cleanup complete]")
 
 
 async def main():
     """Run both the WebSocket server and head tracking loop concurrently."""
-    # Run both tasks concurrently
-    await asyncio.gather(
-        websocket_server(),
-        main_loop()
-    )
+    global shutdown_flag
+    
+    # Create tasks
+    ws_task = asyncio.create_task(websocket_server())
+    main_task = asyncio.create_task(main_loop())
+    
+    # Wait for main loop to complete
+    await main_task
+    
+    # Cancel websocket server
+    ws_task.cancel()
+    try:
+        await ws_task
+    except asyncio.CancelledError:
+        pass
+    
+    print("\n[All tasks completed]")
 
 
 if __name__ == "__main__":
@@ -715,3 +892,6 @@ if __name__ == "__main__":
         asyncio.run(main())
     except KeyboardInterrupt:
         print("\n\n[Interrupted by user]")
+    finally:
+        cv2.destroyAllWindows()
+        print("[Exit complete]")
