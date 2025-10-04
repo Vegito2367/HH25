@@ -1,0 +1,48 @@
+Godot 4.x .gitignore template
+--- Godot-specific ignores ---
+This folder contains generated files and user-specific data.
+It's the most important folder to ignore.
+.godot/
+
+
+--- Python Virtual Environment ---
+Ignore virtual environment folders (e.g., "venv", ".venv")
+venv/
+.venv/
+
+Ignore Python cache files
+pycache/
+*.pyc
+
+
+--- Exported builds ---
+Ignore builds exported from the editor for any platform.
+builds/
+*.export/
+*.pck
+*.zip
+*.exe
+*.dmg
+*.apk
+*.aab
+
+--- Common OS and editor files ---
+macOS
+.DS_Store
+.AppleDouble
+.LSOverride
+
+Windows
+Thumbs.db
+ehthumbs.db
+Desktop.ini
+
+VS Code
+.vscode/
+
+--- AssetStore / Asset Library ---
+Ignore downloaded assets from the asset library
+addons/
+
+If you have specific addons you WANT to track, un-ignore them like this:
+!addons/my_important_addon/

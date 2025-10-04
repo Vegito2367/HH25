@@ -1,0 +1,20 @@
+[gd_scene load_steps=3 format=3 uid="uid://2mclk04ipov8"]
+
+[ext_resource type="Script" path="res://Scripts/screen_controller.gd" id="1_nt2sx"]
+
+[sub_resource type="PlaneMesh" id="PlaneMesh_3a071"]
+
+[node name="Node3D" type="Node3D"]
+script = ExtResource("1_nt2sx")
+
+[node name="Camera3D" type="Camera3D" parent="."]
+transform = Transform3D(1, 0, 0, 0, 0.955268, 0.295741, 0, -0.295741, 0.955268, 0, 0.619651, 0.39744)
+fov = 79.2
+
+[node name="DirectionalLight3D" type="DirectionalLight3D" parent="."]
+transform = Transform3D(1, 0, 0, 0, 0.941911, 0.335863, 0, -0.335863, 0.941911, 0, 0.699795, 1.46923)
+sky_mode = 1
+
+[node name="MeshInstance3D" type="MeshInstance3D" parent="."]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 0, -1.09047)
+mesh = SubResource("PlaneMesh_3a071")
