@@ -71,5 +71,5 @@ mesh = SubResource("PlaneMesh_3a071")
 
 [connection signal="button_down" from="CanvasLayer/Cube" to="." method="_on_cube_button_down"]
 [connection signal="button_down" from="CanvasLayer/Sphere" to="." method="_on_sphere_button_down"]
-[connection signal="button_down" from="CanvasLayer/Diamond" to="." method="_on_diamond_button_down"]
 [connection signal="button_down" from="CanvasLayer/Diamond" to="." method="_on_button_3_button_down"]
+[connection signal="button_down" from="CanvasLayer/Diamond" to="." method="_on_diamond_button_down"]
