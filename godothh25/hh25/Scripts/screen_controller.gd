@@ -11,6 +11,13 @@ extends Node3D
 const SphereScene = preload("res://Scenes/sphere.tscn")
 const CubeScene = preload("res://Scenes/cube.tscn")
 
+# Get a reference to the active camera.
+@onready var camera: Camera3D = get_viewport().get_camera_3d()
+
+var nextShape
+var currentShape = null
+var previousCommand:String=""
+
 # WebSocket client instance
 var _ws_client = WebSocketPeer.new()
 var _is_connected = false
@@ -67,12 +74,28 @@ func _handle_command(command_string: String):
 
 	# Use 'get' with a default value to safely access keys
 	var command = parsed_json.get("command", "none")
+		
 
 	# Use a match statement to handle different commands
 	match command:
 		"insert":
-			var shape = parsed_json.get("shape", "none")
-			_insert_shape(shape)
+			checkCommandCompatibility(command)
+			var shape: String = parsed_json.get("shape", "none")
+			
+			if(shape=="sphere"):
+				currentShape = SphereScene.instantiate()
+			if(shape=="cube"):
+				currentShape = CubeScene.instantiate()
+			add_child(currentShape)
+			currentShape.position = Vector3(0,0,10) #Dummy Position behind camera
+			
+		"selectXY":
+			checkCommandCompatibility(command)
+			var x:float = float(parsed_json.get("x", "0.0"))
+			var y:float = float(parsed_json.get("y", "0.0"))
+			var screen_coords = Vector2(x, y)
+			var world_coords = get_world_coords_on_z0_plane(screen_coords)
+			currentShape.position = world_coords
 		"scale":
 			# TODO: Implement scaling logic
 			print("Received 'scale' command (not yet implemented).")
@@ -81,7 +104,13 @@ func _handle_command(command_string: String):
 			print("Received 'rotate' command (not yet implemented).")
 		_:
 			print("Received unknown command: ", command)
+	previousCommand = command
 
+func GetShapeScene(shape: String):
+	match shape:
+		"cube": return CubeScene
+		"sphere": return SphereScene
+		_: return null
 
 # This function instantiates a new shape in the scene
 func _insert_shape(shape_name: String):
@@ -97,8 +126,52 @@ func _insert_shape(shape_name: String):
 			print("Cannot insert unknown shape: ", shape_name)
 			return
 
-	if new_shape_instance:
-		# Add the new shape as a child of this node
-		add_child(new_shape_instance)
-		# Position it randomly for demonstration
-		new_shape_instance.position = Vector3(0,0,-1)
+		
+		
+func checkCommandCompatibility(command: String):
+	match command:
+		"insert":
+			if !(previousCommand=="" || previousCommand =="insert"): 
+						print("ERROR: INCOMPATIBLE SEQUENCE OF COMMANDS")
+						killProgram()
+		"selectXY":
+			if!(previousCommand=="insert" || previousCommand =="selectXY"): 
+						print("ERROR: INCOMPATIBLE SEQUENCE OF COMMANDS")
+						killProgram()
+		_:
+			pass
+	
+func shapeNullCheck():
+	if (nextShape!=null):
+		print("ERROR: SHAPE NOT FOUND")
+		killProgram()
+func killProgram():
+	get_tree().quit()
+	
+
+
+func get_world_coords_on_z0_plane(screen_pos: Vector2) -> Vector3:
+	# Ensure the camera is available.
+	if not camera:
+		return Vector3.ZERO
+
+	# 1. Define the target plane where Z is always 0.
+	# The normal vector (0, 0, 1) is perpendicular to this plane.
+	var target_plane = Plane(-1*Vector3.FORWARD, 0)
+
+	# 2. Get the ray's origin and direction from the camera.
+	var ray_origin: Vector3 = camera.project_ray_origin(screen_pos)
+	var ray_direction: Vector3 = camera.project_ray_normal(screen_pos)
+
+	# 3. Calculate the intersection point.
+	var intersection_point: Vector3 = target_plane.intersects_ray(ray_origin, ray_direction)
+
+	# This check is important. If the camera looks parallel to the plane,
+	# the ray will never intersect, and the result will be null.
+	if intersection_point != null:
+		# The Z value of this point will be 0 (or a very tiny float value close to it).
+		return intersection_point
+	else:
+		print("Error: Camera ray does not intersect the Z=0 plane.")
+		# Return a sensible default or handle the error.
+		return Vector3.ZERO

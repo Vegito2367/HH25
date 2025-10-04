@@ -8,7 +8,7 @@
 script = ExtResource("1_nt2sx")
 
 [node name="Camera3D" type="Camera3D" parent="."]
-transform = Transform3D(1, 0, 0, 0, 0.955268, 0.295741, 0, -0.295741, 0.955268, 0, 0.619651, 0.39744)
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 0.420356, 0.39744)
 fov = 79.2
 
 [node name="DirectionalLight3D" type="DirectionalLight3D" parent="."]
@@ -16,5 +16,40 @@ transform = Transform3D(1, 0, 0, 0, 0.941911, 0.335863, 0, -0.335863, 0.941911, 
 sky_mode = 1
 
 [node name="MeshInstance3D" type="MeshInstance3D" parent="."]
-transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 0, -1.09047)
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 0, -1.2781)
 mesh = SubResource("PlaneMesh_3a071")
+
+[node name="Control" type="Control" parent="."]
+layout_mode = 3
+anchors_preset = 0
+offset_right = 40.0
+offset_bottom = 40.0
+
+[node name="Button" type="Button" parent="Control"]
+layout_mode = 0
+offset_left = 370.0
+offset_top = 536.0
+offset_right = 418.0
+offset_bottom = 567.0
+scale = Vector2(1.5, 1.5)
+text = "Cube"
+
+[node name="Button2" type="Button" parent="Control"]
+layout_mode = 0
+offset_left = 506.0
+offset_top = 536.0
+offset_right = 569.0
+offset_bottom = 567.0
+scale = Vector2(1.5, 1.5)
+text = "Sphere
+"
+
+[node name="Button3" type="Button" parent="Control"]
+layout_mode = 0
+offset_left = 652.0
+offset_top = 536.0
+offset_right = 731.0
+offset_bottom = 567.0
+scale = Vector2(1.5, 1.5)
+text = "Diamond
+"
