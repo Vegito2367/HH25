@@ -1,11 +1,61 @@
-[gd_scene load_steps=3 format=3 uid="uid://2mclk04ipov8"]
+[gd_scene load_steps=4 format=3 uid="uid://2mclk04ipov8"]
 
 [ext_resource type="Script" path="res://Scripts/screen_controller.gd" id="1_nt2sx"]
+
+[sub_resource type="CanvasTexture" id="CanvasTexture_vjct1"]
 
 [sub_resource type="PlaneMesh" id="PlaneMesh_3a071"]
 
 [node name="Node3D" type="Node3D"]
 script = ExtResource("1_nt2sx")
+zDistance = 5.0
+
+[node name="CanvasLayer" type="Control" parent="."]
+layout_mode = 3
+anchors_preset = 15
+anchor_right = 1.0
+anchor_bottom = 1.0
+grow_horizontal = 2
+grow_vertical = 2
+
+[node name="Cube" type="Button" parent="CanvasLayer"]
+layout_mode = 0
+offset_left = 370.0
+offset_top = 536.0
+offset_right = 418.0
+offset_bottom = 567.0
+scale = Vector2(1.5, 1.5)
+text = "Cube"
+
+[node name="Sphere" type="Button" parent="CanvasLayer"]
+layout_mode = 0
+offset_left = 506.0
+offset_top = 536.0
+offset_right = 569.0
+offset_bottom = 567.0
+scale = Vector2(1.5, 1.5)
+text = "Sphere
+"
+
+[node name="Diamond" type="Button" parent="CanvasLayer"]
+layout_mode = 0
+offset_left = 652.0
+offset_top = 536.0
+offset_right = 731.0
+offset_bottom = 567.0
+scale = Vector2(1.5, 1.5)
+text = "Diamond
+"
+
+[node name="Cursor" type="TextureRect" parent="CanvasLayer"]
+layout_mode = 0
+offset_left = 100.0
+offset_top = 72.0
+offset_right = 146.0
+offset_bottom = 120.0
+scale = Vector2(0.5, 0.5)
+mouse_filter = 2
+texture = SubResource("CanvasTexture_vjct1")
 
 [node name="Camera3D" type="Camera3D" parent="."]
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 0.420356, 0.39744)
@@ -19,37 +69,7 @@ sky_mode = 1
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 0, -1.2781)
 mesh = SubResource("PlaneMesh_3a071")
 
-[node name="Control" type="Control" parent="."]
-layout_mode = 3
-anchors_preset = 0
-offset_right = 40.0
-offset_bottom = 40.0
-
-[node name="Button" type="Button" parent="Control"]
-layout_mode = 0
-offset_left = 370.0
-offset_top = 536.0
-offset_right = 418.0
-offset_bottom = 567.0
-scale = Vector2(1.5, 1.5)
-text = "Cube"
-
-[node name="Button2" type="Button" parent="Control"]
-layout_mode = 0
-offset_left = 506.0
-offset_top = 536.0
-offset_right = 569.0
-offset_bottom = 567.0
-scale = Vector2(1.5, 1.5)
-text = "Sphere
-"
-
-[node name="Button3" type="Button" parent="Control"]
-layout_mode = 0
-offset_left = 652.0
-offset_top = 536.0
-offset_right = 731.0
-offset_bottom = 567.0
-scale = Vector2(1.5, 1.5)
-text = "Diamond
-"
+[connection signal="button_down" from="CanvasLayer/Cube" to="." method="_on_cube_button_down"]
+[connection signal="button_down" from="CanvasLayer/Sphere" to="." method="_on_sphere_button_down"]
+[connection signal="button_down" from="CanvasLayer/Diamond" to="." method="_on_diamond_button_down"]
+[connection signal="button_down" from="CanvasLayer/Diamond" to="." method="_on_button_3_button_down"]

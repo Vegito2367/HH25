@@ -10,9 +10,12 @@ import websockets
 import json
 import math
 import sys, select
+import random as r
 
 
 # --- Main Application Logic ---
+def random_between(m, n):
+    return r.uniform(m, n)
 
 async def socketTest(websocket):
     print("Godot client connected!")
@@ -20,19 +23,32 @@ async def socketTest(websocket):
         while True:
             command_to_send = None
             if select.select([sys.stdin], [], [], 0)[0]:
-                    key_input = sys.stdin.read(1)
-                    if key_input == 'q':  # Quit
-                        break
-                    elif key_input == 't':
-                        print("T KEY PRESSED, COMMAND SENT")
-                        command_to_send = {"command": "insert", "shape": "sphere"}
-                    elif key_input == 'y':
-                        print("Y KEY PRESSED, COMMAND SENT")
-                        command_to_send = {"command": "insert", "shape": "cube"}
-                    elif key_input =='u':
-                        command_to_send = {"command":"selectXY", "x":"20.5","y":"30.5"}
-                    elif key_input =='i':
-                        command_to_send = {"command":"selectXY", "x":"40.5","y":"20.5"}
+                key_input = sys.stdin.read(1)
+                x =str(random_between(100,500))
+                y=str(random_between(100,500))
+                xper = str(random_between(0,100))
+                yper = str(random_between(0,100))
+                cubex = 35
+                buttony=85
+                sphx=45
+                diamondx=65
+                if key_input == 'q':  # Quit
+                    break
+                elif key_input == 't':
+                    command_to_send = {"command": "click", "x": sphx, "y": buttony}
+                elif key_input == 'y':
+                    command_to_send = {"command": "click", "x": cubex, "y": buttony}
+                elif key_input == 'u':
+                    command_to_send = {"command": "selectXY", "x": "200.5", "y": "300.5"}
+                elif key_input == 'i':
+                    command_to_send = {"command": "selectXY", "x": "400.5", "y": "200.5"}
+                elif key_input == 'm':  # eye movement
+                    command_to_send = {"command": "cursor", "x": str(xper), "y": str(yper) }
+                elif key_input == 'n':  # eye click
+                    command_to_send = {"command": "cursor", "x": str(xper), "y": str(yper) }
+                    command_to_send = {"command": "click", "x": str(xper), "y": str(yper)}
+                elif key_input == 'j':  # eye click
+                    command_to_send = {"command": "click", "x": diamondx, "y": buttony}
             if command_to_send:
                 await websocket.send(json.dumps(command_to_send))
                 print(f"Sent: {command_to_send}")           
