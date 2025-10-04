@@ -80,24 +80,34 @@ func _handle_command(command_string: String):
 	var command = parsed_json.get("command", "none")
 
 	# Use a match statement to handle different commands
+	print("COM RUN:",command)
 	match command:
 		"insert":
 			checkCommandCompatibility(command)
 			var shape: String = parsed_json.get("shape", "none")
-			
+			if(currentShape!=null && previousCommand=="insert"):
+				remove_child(currentShape)
 			if(shape=="sphere"):
 				currentShape = SphereScene.instantiate()
 			if(shape=="cube"):
 				currentShape = CubeScene.instantiate()
 			add_child(currentShape)
-			currentShape.position = Vector3(0,0,10) #Dummy Position behind camera
+			currentShape.position = Vector3(0,0,10)
+			previousCommand = command
+			 #Dummy Position behind camera
 		"selectXY":
 			checkCommandCompatibility(command)
-			var x:float = float(parsed_json.get("x", "0.0"))
-			var y:float = float(parsed_json.get("y", "0.0"))
-			var screen_coords = Vector2(x , y)
+			var screen_coords = cursor.position
 			var world_coords = get_world_coords_on_z0_plane(screen_coords)
 			currentShape.position = world_coords
+			previousCommand = command
+		
+		"selectZ":
+			checkCommandCompatibility(command)
+			var z:float = float(parsed_json.get("z", "0.0"))
+			currentShape.position.z = z
+			currentShape=null
+			previousCommand = command
 		
 		"cursor":
 			var xper:float = float(parsed_json.get("x", "0.0"))/100
@@ -105,7 +115,24 @@ func _handle_command(command_string: String):
 			var currentViewport = get_viewport().size
 			var screen_coords = Vector2(currentViewport.x * xper, currentViewport.y * yper)
 			cursor.position = screen_coords
-		
+			if(currentShape!=null):
+				if(previousCommand=="insert"):
+					currentShape.position = get_world_coords_on_z0_plane(screen_coords)
+				elif (previousCommand=="selectXY"):
+					currentShape.position.z = -0.01*cursor.position.x
+		"select":
+			if previousCommand=="insert":
+				_handle_command(JSON.stringify({
+					"command":"selectXY",
+					"x": cursor.position.x,
+					"y":cursor.position.y
+				}))
+				
+			elif previousCommand=="selectXY":
+				_handle_command(JSON.stringify({
+					"command":"selectZ",
+					"z": -0.01*cursor.position.x,
+				}))
 		"click":
 			var xper:float = float(parsed_json.get("x", "0.0"))/100
 			var yper:float = float(parsed_json.get("y", "0.0"))/100
@@ -121,17 +148,20 @@ func _handle_command(command_string: String):
 			print("Received 'rotate' command (not yet implemented).")
 		_:
 			print("Received unknown command: ", command)
-	previousCommand = command
+	
 		
 		
 func checkCommandCompatibility(command: String):
 	match command:
 		"insert":
-			if !(previousCommand in ["","insert","selectXY","cursor","click"]): 
+			if !(previousCommand in ["","insert","selectZ"]): 
 						print("ERROR: INCOMPATIBLE SEQUENCE OF COMMANDS")
 						killProgram()
 		"selectXY":
-			if!(previousCommand=="insert" || previousCommand =="selectXY"): 
+			if !(previousCommand in ["","insert","selectXY"]): 
+						print("ERROR: INCOMPATIBLE SEQUENCE OF COMMANDS")
+						killProgram()
+		"selectZ": if!(previousCommand in ["selectXY", "selectZ"]): 
 						print("ERROR: INCOMPATIBLE SEQUENCE OF COMMANDS")
 						killProgram()
 		_:

@@ -32,23 +32,22 @@ async def socketTest(websocket):
                 buttony=85
                 sphx=45
                 diamondx=65
+                z = random_between(2,10)
                 if key_input == 'q':  # Quit
                     break
                 elif key_input == 't':
                     command_to_send = {"command": "click", "x": sphx, "y": buttony}
                 elif key_input == 'y':
                     command_to_send = {"command": "click", "x": cubex, "y": buttony}
-                elif key_input == 'u':
-                    command_to_send = {"command": "selectXY", "x": "200.5", "y": "300.5"}
-                elif key_input == 'i':
-                    command_to_send = {"command": "selectXY", "x": "400.5", "y": "200.5"}
+                elif key_input == 'z':
+                    command_to_send = {"command": "select"}
                 elif key_input == 'm':  # eye movement
                     command_to_send = {"command": "cursor", "x": str(xper), "y": str(yper) }
                 elif key_input == 'n':  # eye click
                     command_to_send = {"command": "cursor", "x": str(xper), "y": str(yper) }
                     command_to_send = {"command": "click", "x": str(xper), "y": str(yper)}
                 elif key_input == 'j':  # eye click
-                    command_to_send = {"command": "click", "x": diamondx, "y": buttony}
+                    command_to_send = {"command": "selectZ", "z":str(z)}
             if command_to_send:
                 await websocket.send(json.dumps(command_to_send))
                 print(f"Sent: {command_to_send}")           
