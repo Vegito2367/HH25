@@ -20,7 +20,6 @@ DEADZONE_ROLL = 10.0    # degrees - Y axis deadzone
 HYSTERESIS_DEG = 1.0    # small hysteresis to prevent chatter
 TAU_VEL = 0.18          # velocity slew time constant (seconds)
 YAW_SMOOTHING = 0.3     # Smoothing factor for yaw (0-1, higher = more smoothing)
-<<<<<<< HEAD
 
 # Face gesture detection config
 BROW_BASELINE_FRAMES = 60   # frames to learn neutral brow distance
@@ -30,8 +29,6 @@ BLINK_EAR_THRESH = 0.22     # raised a bit so blinks register sooner
 BLINK_MIN_FRAMES = 1        # count blink if eyes closed for >= 1 frame
 DOUBLE_BLINK_WINDOW = 0.6   # seconds between two blinks to count as double
 DOUBLE_BLINK_HOLD = 0.2     # seconds to hold the output flag = True
-=======
->>>>>>> 15d9f390fbf7b985ec3840388d7df7a01ebd9d6f
 
 CALIB_FILE = "simple_head_calib.json"
 
@@ -106,7 +103,6 @@ def initialize_camera():
     return None, None
 
 
-<<<<<<< HEAD
 def dist(a, b): 
     return float(np.linalg.norm(a - b))
 
@@ -135,8 +131,6 @@ def eye_aspect_ratio(lm, up, dn, inn, outn, w, h):
     return vertical / horiz
 
 
-=======
->>>>>>> 15d9f390fbf7b985ec3840388d7df7a01ebd9d6f
 def estimate_yaw_geometric(landmarks, frame_shape):
     """
     Estimate yaw using geometric method: nose position relative to eyes.
@@ -507,7 +501,6 @@ async def main_loop():
     # Initialize to None so first detection sets the value
     smoothed_yaw = None
     smoothed_roll = None
-<<<<<<< HEAD
     
     # Face gesture state
     brow_samples = deque(maxlen=BROW_BASELINE_FRAMES)
@@ -522,8 +515,6 @@ async def main_loop():
     prev_mouth_open = False
     prev_brow_up = False
     prev_double_blink = False
-=======
->>>>>>> 15d9f390fbf7b985ec3840388d7df7a01ebd9d6f
     
     params = {
         "vmax_x": VMAX_X,
@@ -542,7 +533,6 @@ async def main_loop():
     prev_time = time.time()
     last_ws_send = time.time()
     
-<<<<<<< HEAD
     print("\n=== HEAD CURSOR + FACE GESTURES CONTROL ===")
     print("✓ Camera initialized successfully!")
     print("✓ Using robust geometric yaw estimation")
@@ -554,16 +544,6 @@ async def main_loop():
     print("  - Mouth open/close detection")
     print("  - Eyebrow raise detection")
     print("  - Double blink detection")
-=======
-    print("\n=== HEAD CURSOR CONTROL (GEOMETRIC YAW) ===")
-    print("✓ Camera initialized successfully!")
-    print("✓ Using robust geometric yaw estimation")
-    print("\nCONTROLS:")
-    print("  - Turn head LEFT → cursor moves LEFT")
-    print("  - Turn head RIGHT → cursor moves RIGHT")
-    print("  - Tilt head (ear to shoulder) → cursor moves up/down")
-    print("  - Speed: 300 px/s")
->>>>>>> 15d9f390fbf7b985ec3840388d7df7a01ebd9d6f
     print("\nKEYS:")
     print("  'c' - Calibrate (4 directions + neutral)")
     print("  's' / 'l' - Save / load calibration")
@@ -631,24 +611,13 @@ async def main_loop():
                 # Update with smoothing
                 if yaw_new is not None:
                     if smoothed_yaw is None:
-<<<<<<< HEAD
                         smoothed_yaw = yaw_new
                     else:
-=======
-                        # First valid detection - initialize directly
-                        smoothed_yaw = yaw_new
-                    else:
-                        # Exponential moving average
->>>>>>> 15d9f390fbf7b985ec3840388d7df7a01ebd9d6f
                         smoothed_yaw = YAW_SMOOTHING * smoothed_yaw + (1 - YAW_SMOOTHING) * yaw_new
                     yaw = smoothed_yaw
                 
                 if roll_new is not None:
                     if smoothed_roll is None:
-<<<<<<< HEAD
-=======
-                        # First valid detection - initialize directly
->>>>>>> 15d9f390fbf7b985ec3840388d7df7a01ebd9d6f
                         smoothed_roll = roll_new
                     else:
                         smoothed_roll = 0.5 * smoothed_roll + 0.5 * roll_new
@@ -733,20 +702,12 @@ async def main_loop():
                     cursor_x = np.clip(cursor_x, 0, w - 1)
                     cursor_y = np.clip(cursor_y, 0, h - 1)
                 else:
-<<<<<<< HEAD
                     v_cmd = [0.0, 0.0]
             else:
                 # No face detected
                 v_cmd = [0.0, 0.0]
                 l_run = 0
                 r_run = 0
-=======
-                    # No calibration or no valid yaw - stop movement
-                    v_cmd = [0.0, 0.0]
-            else:
-                # No face detected - stop movement
-                v_cmd = [0.0, 0.0]
->>>>>>> 15d9f390fbf7b985ec3840388d7df7a01ebd9d6f
             
             # Send cursor position via WebSocket at regular intervals
             if current_time - last_ws_send >= WS_UPDATE_RATE:
@@ -862,10 +823,6 @@ async def main_loop():
                     with open(CALIB_FILE, 'r') as f:
                         calib = json.load(f)
                     print(f"\n[Calibration loaded]")
-<<<<<<< HEAD
-=======
-                    # Initialize smoothed values from loaded calibration
->>>>>>> 15d9f390fbf7b985ec3840388d7df7a01ebd9d6f
                     if smoothed_yaw is None:
                         smoothed_yaw = calib.get("neutral_yaw", 0)
                     if smoothed_roll is None:
@@ -904,10 +861,6 @@ async def main_loop():
         face_mesh.close()
         cap.release()
         cv2.destroyAllWindows()
-<<<<<<< HEAD
-=======
-        # Force window destruction
->>>>>>> 15d9f390fbf7b985ec3840388d7df7a01ebd9d6f
         cv2.waitKey(1)
         shutdown_flag = True
         print("[Cleanup complete]")
@@ -940,9 +893,5 @@ if __name__ == "__main__":
     except KeyboardInterrupt:
         print("\n\n[Interrupted by user]")
     finally:
-<<<<<<< HEAD
-=======
-        # Final cleanup
->>>>>>> 15d9f390fbf7b985ec3840388d7df7a01ebd9d6f
         cv2.destroyAllWindows()
         print("[Exit complete]")
