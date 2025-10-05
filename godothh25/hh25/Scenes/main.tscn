@@ -181,7 +181,7 @@ scene_node = NodePath("../..")
 [node name="FileDialog" type="FileDialog" parent="CanvasLayer/Control"]
 process_mode = 3
 initial_position = 4
-size = Vector2i(303, 180)
+size = Vector2i(700, 500)
 access = 2
 filters = PackedStringArray("*.glb ; glTF Binary")
 
@@ -216,5 +216,6 @@ transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 0, -1.3886)
 [connection signal="button_down" from="CanvasLayer/ColorWheel/HBoxContainer/Blue" to="." method="_on_blue_button_down"]
 [connection signal="button_down" from="CanvasLayer/ColorWheel/HBoxContainer/Black" to="." method="_on_black_button_down"]
 [connection signal="button_down" from="CanvasLayer/ColorWheel/HBoxContainer/White" to="." method="_on_white_button_down"]
+[connection signal="canceled" from="CanvasLayer/Control/FileDialog" to="CanvasLayer/Control" method="_on_file_dialog_canceled"]
 [connection signal="file_selected" from="CanvasLayer/Control/FileDialog" to="CanvasLayer/Control" method="_on_file_dialog_file_selected"]
 [connection signal="button_down" from="CanvasLayer/Control/SaveFile" to="CanvasLayer/Control" method="_on_save_file_button_down"]

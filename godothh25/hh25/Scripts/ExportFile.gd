@@ -17,8 +17,7 @@ func _on_file_dialog_file_selected(path: String):
 
 # This function is called when the dialog closes, either by
 # saving, canceling, or pressing the 'X' button.
-func _on_file_dialog_popup_hide():
-	get_tree().paused = false
+	
 
 # --- Function to call on success (Step 3) ---
 
@@ -49,4 +48,10 @@ func export_node_to_glb(node: Node3D, file_path: String):
 
 func _on_save_file_button_down() -> void:
 	get_tree().paused = true
+	file_dialog.current_dir = "/Users/seksierthanyou/Desktop/SideProjects/hackHarvard25"
+	file_dialog.current_file = "MyNewModel.glb"
 	file_dialog.popup_centered()
+
+
+func _on_file_dialog_canceled() -> void:
+	get_tree().paused = false
