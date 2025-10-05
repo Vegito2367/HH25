@@ -46,13 +46,29 @@ func _ready():
 	else:
 		print("Connection initiated.")
 
+func RESET():
+	camera.global_position = originalPosition
+	baseParent.rotation = Vector3.ZERO
+	var childs = baseParent.get_children()
+	for c in childs:
+		c.queue_free()
+	
+
+func removeRecentNode():
+	if(nodesList.size()>0):
+		var lastElem = nodesList.pop_back()
+		lastElem.queue_free()
 func _process(_delta):
 	if(currentShape!=null):
 		debugBox.text = currentShape.name
 	# We must poll the connection state
 	_ws_client.poll()
 	var state = _ws_client.get_ready_state()
-
+	if (Input.is_action_just_pressed("RESET")):
+		RESET()
+	
+	if (Input.is_action_just_pressed("reset")):
+		removeRecentNode()
 	if state == WebSocketPeer.STATE_OPEN:
 		if not _is_connected:
 			_is_connected = true
@@ -341,3 +357,4 @@ func _on_cube_button_down() -> void:
 		"shape": "cube"
 	})
 	_handle_command(com)
+	
