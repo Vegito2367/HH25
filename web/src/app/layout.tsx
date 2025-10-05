@@ -1,7 +1,7 @@
 import type { Metadata } from "next";
 import { Geist, Geist_Mono } from "next/font/google";
 import "./globals.css";
-import Navbar from "@/components/Navbar";
+import LookSmithNavbar from "@/components/LookSmithNavbar";
 
 const geistSans = Geist({
   variable: "--font-geist-sans",
@@ -14,8 +14,8 @@ const geistMono = Geist_Mono({
 });
 
 export const metadata: Metadata = {
-  title: "WebApp - Fiverr-style Marketplace",
-  description: "A modern marketplace for freelancers and clients",
+  title: "LookSmith - 3D Art Platform",
+  description: "The premier platform for 3D artists to showcase their work and connect with clients worldwide.",
 };
 
 export default function RootLayout({
@@ -24,12 +24,12 @@ export default function RootLayout({
   children: React.ReactNode;
 }>) {
   return (
-    <html lang="en">
+    <html lang="en" className="light">
       <body
-        className={`${geistSans.variable} ${geistMono.variable} antialiased`}
+        className={`${geistSans.variable} ${geistMono.variable} antialiased bg-background text-foreground`}
       >
-        <Navbar />
-        <main className="min-h-screen bg-gray-50">
+        <LookSmithNavbar />
+        <main className="min-h-screen">
           {children}
         </main>
       </body>

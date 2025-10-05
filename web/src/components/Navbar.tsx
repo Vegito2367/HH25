@@ -44,8 +44,8 @@ export default function Navbar() {
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
           <div className="flex justify-between h-16">
             <div className="flex items-center">
-              <Link href="/" className="text-2xl font-bold text-green-600">
-                WebApp
+              <Link href="/" className="text-2xl font-bold text-primary">
+                FindSmith
               </Link>
             </div>
           </div>
@@ -59,8 +59,8 @@ export default function Navbar() {
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
         <div className="flex justify-between h-16">
           <div className="flex items-center">
-            <Link href="/" className="text-2xl font-bold text-green-600">
-              WebbApp
+            <Link href="/" className="text-2xl font-bold text-primary">
+              FindSmith
             </Link>
           </div>
 
@@ -69,19 +69,19 @@ export default function Navbar() {
               <>
                 <Link
                   href="/listings"
-                  className="text-gray-700 hover:text-green-600 px-3 py-2 rounded-md text-sm font-medium"
+                  className="text-muted-foreground hover:text-primary px-3 py-2 rounded-md text-sm font-medium"
                 >
                   Listings
                 </Link>
                 <Link
                   href="/create-listing"
-                  className="text-gray-700 hover:text-green-600 px-3 py-2 rounded-md text-sm font-medium"
+                  className="text-muted-foreground hover:text-primary px-3 py-2 rounded-md text-sm font-medium"
                 >
                   Create Listing
                 </Link>
                 <Link
                   href="/requests"
-                  className="text-gray-700 hover:text-green-600 px-3 py-2 rounded-md text-sm font-medium"
+                  className="text-muted-foreground hover:text-primary px-3 py-2 rounded-md text-sm font-medium"
                 >
                   Requests
                 </Link>
@@ -103,13 +103,13 @@ export default function Navbar() {
               <>
                 <Link
                   href="/auth"
-                  className="bg-green-600 text-white px-4 py-2 rounded-md text-sm font-medium hover:bg-green-700"
+                  className="bg-primary text-primary-foreground px-4 py-2 rounded-md text-sm font-medium hover:bg-primary/90"
                 >
                   Sign In
                 </Link>
                 <Link
                   href="/auth"
-                  className="border border-green-600 text-green-600 px-4 py-2 rounded-md text-sm font-medium hover:bg-green-50"
+                  className="border border-primary text-primary px-4 py-2 rounded-md text-sm font-medium hover:bg-primary/10"
                 >
                   Sign Up
                 </Link>

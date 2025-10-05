@@ -149,7 +149,7 @@ export default function CreateListingPage() {
   if (loading) {
     return (
       <div className="min-h-screen bg-gray-50 flex items-center justify-center">
-        <div className="animate-spin rounded-full h-32 w-32 border-b-2 border-green-600"></div>
+        <div className="animate-spin rounded-full h-32 w-32 border-b-2 border-primary"></div>
       </div>
     )
   }
@@ -180,7 +180,7 @@ export default function CreateListingPage() {
                   required
                   value={formData.title}
                   onChange={handleInputChange}
-                  className="block w-full pl-10 pr-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-green-500 focus:border-green-500"
+                  className="block w-full pl-10 pr-3 py-2 border border-input rounded-md focus:outline-none focus:ring-ring focus:border-ring"
                   placeholder="e.g., Professional Logo Design"
                 />
               </div>
@@ -198,7 +198,7 @@ export default function CreateListingPage() {
                 rows={6}
                 value={formData.description}
                 onChange={handleInputChange}
-                className="block w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-green-500 focus:border-green-500"
+                className="block w-full px-3 py-2 border border-input rounded-md focus:outline-none focus:ring-ring focus:border-ring"
                 placeholder="Describe what you offer, your experience, and what clients can expect..."
               />
             </div>
@@ -223,7 +223,7 @@ export default function CreateListingPage() {
                     step="0.01"
                     value={formData.price}
                     onChange={handleInputChange}
-                    className="block w-full pl-10 pr-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-green-500 focus:border-green-500"
+                    className="block w-full pl-10 pr-3 py-2 border border-input rounded-md focus:outline-none focus:ring-ring focus:border-ring"
                     placeholder="25.00"
                   />
                 </div>
@@ -244,7 +244,7 @@ export default function CreateListingPage() {
                     required
                     value={formData.category}
                     onChange={handleInputChange}
-                    className="block w-full pl-10 pr-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-green-500 focus:border-green-500"
+                    className="block w-full pl-10 pr-3 py-2 border border-input rounded-md focus:outline-none focus:ring-ring focus:border-ring"
                   >
                     <option value="">Select a category</option>
                     {categories.map((category) => (
@@ -273,15 +273,15 @@ export default function CreateListingPage() {
                   accept=".glb"
                   onChange={handleFileChange}
                   disabled={uploadingFile}
-                  className="block w-full pl-10 pr-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-green-500 focus:border-green-500 disabled:opacity-50"
+                  className="block w-full pl-10 pr-3 py-2 border border-input rounded-md focus:outline-none focus:ring-ring focus:border-ring disabled:opacity-50"
                 />
               </div>
               <p className="mt-1 text-sm text-gray-500">
                 Upload a GLB file to showcase your 3D model (max 50MB)
               </p>
               {glbFile && (
-                <div className="mt-2 p-2 bg-green-50 border border-green-200 rounded-md">
-                  <p className="text-sm text-green-600">
+                <div className="mt-2 p-2 bg-primary/10 border border-primary/20 rounded-md">
+                  <p className="text-sm text-primary">
                     ✓ File uploaded: {glbFile.name}
                   </p>
                 </div>
@@ -310,7 +310,7 @@ export default function CreateListingPage() {
                   name="image_url"
                   value={formData.image_url}
                   onChange={handleInputChange}
-                  className="block w-full pl-10 pr-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-green-500 focus:border-green-500"
+                  className="block w-full pl-10 pr-3 py-2 border border-input rounded-md focus:outline-none focus:ring-ring focus:border-ring"
                   placeholder="https://example.com/image.jpg"
                 />
               </div>
@@ -337,7 +337,7 @@ export default function CreateListingPage() {
             )}
 
             {success && (
-              <div className="bg-green-50 border border-green-200 text-green-600 px-4 py-3 rounded-md text-sm">
+              <div className="bg-primary/10 border border-primary/20 text-primary px-4 py-3 rounded-md text-sm">
                 {success}
               </div>
             )}
@@ -347,14 +347,14 @@ export default function CreateListingPage() {
               <button
                 type="button"
                 onClick={() => router.back()}
-                className="px-6 py-2 border border-gray-300 rounded-md text-gray-700 hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-green-500"
+                className="px-6 py-2 border border-input rounded-md text-muted-foreground hover:bg-muted focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-ring"
               >
                 Cancel
               </button>
               <button
                 type="submit"
                 disabled={submitting}
-                className="px-6 py-2 bg-green-600 text-white rounded-md hover:bg-green-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-green-500 disabled:opacity-50 disabled:cursor-not-allowed"
+                className="px-6 py-2 bg-primary text-primary-foreground rounded-md hover:bg-primary/90 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-ring disabled:opacity-50 disabled:cursor-not-allowed"
               >
                 {submitting ? 'Creating...' : 'Create Listing'}
               </button>

@@ -60,7 +60,7 @@ export default function AuthPage() {
               Or{' '}
               <button
                 onClick={() => setIsLogin(false)}
-                className="font-medium text-green-600 hover:text-green-500"
+                className="font-medium text-primary hover:text-primary/80"
               >
                 create a new account
               </button>
@@ -70,7 +70,7 @@ export default function AuthPage() {
               Or{' '}
               <button
                 onClick={() => setIsLogin(true)}
-                className="font-medium text-green-600 hover:text-green-500"
+                className="font-medium text-primary hover:text-primary/80"
               >
                 sign in to existing account
               </button>
@@ -98,7 +98,7 @@ export default function AuthPage() {
                     required={!isLogin}
                     value={name}
                     onChange={(e) => setName(e.target.value)}
-                    className="appearance-none block w-full pl-10 pr-3 py-2 border border-gray-300 rounded-md placeholder-gray-400 focus:outline-none focus:ring-green-500 focus:border-green-500 sm:text-sm"
+                    className="appearance-none block w-full pl-10 pr-3 py-2 border border-input rounded-md placeholder-muted-foreground focus:outline-none focus:ring-ring focus:border-ring sm:text-sm"
                     placeholder="Enter your full name"
                   />
                 </div>
@@ -121,7 +121,7 @@ export default function AuthPage() {
                   required
                   value={email}
                   onChange={(e) => setEmail(e.target.value)}
-                  className="appearance-none block w-full pl-10 pr-3 py-2 border border-gray-300 rounded-md placeholder-gray-400 focus:outline-none focus:ring-green-500 focus:border-green-500 sm:text-sm"
+                  className="appearance-none block w-full pl-10 pr-3 py-2 border border-input rounded-md placeholder-muted-foreground focus:outline-none focus:ring-ring focus:border-ring sm:text-sm"
                   placeholder="Enter your email"
                 />
               </div>
@@ -143,7 +143,7 @@ export default function AuthPage() {
                   required
                   value={password}
                   onChange={(e) => setPassword(e.target.value)}
-                  className="appearance-none block w-full pl-10 pr-10 py-2 border border-gray-300 rounded-md placeholder-gray-400 focus:outline-none focus:ring-green-500 focus:border-green-500 sm:text-sm"
+                  className="appearance-none block w-full pl-10 pr-10 py-2 border border-input rounded-md placeholder-muted-foreground focus:outline-none focus:ring-ring focus:border-ring sm:text-sm"
                   placeholder="Enter your password"
                 />
                 <div className="absolute inset-y-0 right-0 pr-3 flex items-center">
@@ -172,7 +172,7 @@ export default function AuthPage() {
               <button
                 type="submit"
                 disabled={loading}
-                className="group relative w-full flex justify-center py-2 px-4 border border-transparent text-sm font-medium rounded-md text-white bg-green-600 hover:bg-green-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-green-500 disabled:opacity-50 disabled:cursor-not-allowed"
+                className="group relative w-full flex justify-center py-2 px-4 border border-transparent text-sm font-medium rounded-md text-primary-foreground bg-primary hover:bg-primary/90 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-ring disabled:opacity-50 disabled:cursor-not-allowed"
               >
                 {loading ? 'Loading...' : (isLogin ? 'Sign In' : 'Sign Up')}
               </button>

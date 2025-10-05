@@ -140,7 +140,7 @@ export default function ListingsPage() {
                 placeholder="Search services..."
                 value={searchTerm}
                 onChange={(e) => setSearchTerm(e.target.value)}
-                className="block w-full pl-10 pr-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-green-500 focus:border-green-500"
+                className="block w-full pl-10 pr-3 py-2 border border-input rounded-md focus:outline-none focus:ring-ring focus:border-ring"
               />
             </div>
 
@@ -152,7 +152,7 @@ export default function ListingsPage() {
               <select
                 value={selectedCategory}
                 onChange={(e) => setSelectedCategory(e.target.value)}
-                className="block w-full pl-10 pr-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-green-500 focus:border-green-500"
+                className="block w-full pl-10 pr-3 py-2 border border-input rounded-md focus:outline-none focus:ring-ring focus:border-ring"
               >
                 {categories.map((category) => (
                   <option key={category} value={category}>
@@ -170,7 +170,7 @@ export default function ListingsPage() {
               <select
                 value={sortBy}
                 onChange={(e) => setSortBy(e.target.value)}
-                className="block w-full pl-10 pr-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-green-500 focus:border-green-500"
+                className="block w-full pl-10 pr-3 py-2 border border-input rounded-md focus:outline-none focus:ring-ring focus:border-ring"
               >
                 <option value="newest">Newest First</option>
                 <option value="oldest">Oldest First</option>
@@ -214,7 +214,7 @@ export default function ListingsPage() {
                   <h3 className="text-xl font-semibold text-gray-900 line-clamp-2 flex-1">
                     {listing.title}
                   </h3>
-                  <span className="text-2xl font-bold text-green-600 ml-2 flex-shrink-0">
+                  <span className="text-2xl font-bold text-primary ml-2 flex-shrink-0">
                     ${listing.price}
                   </span>
                 </div>
@@ -226,7 +226,7 @@ export default function ListingsPage() {
 
                 {/* Category and Rating */}
                 <div className="flex items-center justify-between mb-4">
-                  <span className="bg-green-100 text-green-800 px-3 py-1 rounded-full text-sm font-medium">
+                  <span className="bg-primary/10 text-primary px-3 py-1 rounded-full text-sm font-medium">
                     {listing.category}
                   </span>
                   <div className="flex items-center">
@@ -239,7 +239,7 @@ export default function ListingsPage() {
                 {/* Seller and Contact Button */}
                 <div className="flex items-center justify-between mt-auto">
                   <span className="text-sm text-gray-500">by {listing.seller_name}</span>
-                  <button className="bg-green-600 text-white px-4 py-2 rounded-md text-sm font-medium hover:bg-green-700 transition-colors">
+                  <button className="bg-primary text-primary-foreground px-4 py-2 rounded-md text-sm font-medium hover:bg-primary/90 transition-colors">
                     Contact Seller
                   </button>
                 </div>
