@@ -24,6 +24,7 @@ YAW_SMOOTHING = 0.3     # Smoothing factor for yaw (0-1, higher = more smoothing
 # Face gesture detection config
 BROW_BASELINE_FRAMES = 60   # frames to learn neutral brow distance
 BROW_UP_FACTOR = 0.20       # increased: requires more eyebrow movement to trigger
+BROW_HOLD_TIME = 0.66       # seconds eyebrows must be held up to trigger
 MOUTH_OPEN_THRESH = 0.38    # mouth-aspect-ratio threshold for open/close
 BLINK_EAR_THRESH = 0.22     # raised a bit so blinks register sooner
 BLINK_MIN_FRAMES = 1        # count blink if eyes closed for >= 1 frame
@@ -518,12 +519,16 @@ async def main_loop():
     prev_brow_up = False
     prev_double_blink = False
     
+    # Brow hold timer
+    brow_up_start_time = None
+    brow_triggered = False  # Track if we already triggered this brow raise
+    
     # Rate limiting for select/click commands
     last_select_click_time = 0.0
     
-    # Mode cycling: 0=cursor/click, 1=move, 2=stagerotate
+    # Mode cycling: 0=cursor, 1=stagerotate
     current_mode = 0
-    mode_names = ["cursor/click", "move", "stagerotate"]
+    mode_names = ["cursor", "stagerotate"]
     
     params = {
         "vmax_x": VMAX_X,
@@ -552,12 +557,13 @@ async def main_loop():
     print("\nFACE GESTURES:")
     print("  - Mouth open → 'select' (or 'click' if in bottom 15%)")
     print("    * Rate limited: 2 second cooldown between select/click")
-    print("  - Eyebrow raise → cycles mode (cursor/click → move → stagerotate)")
+    print("  - Eyebrow raise → toggles mode (cursor ↔ stagerotate)")
     print("  - Double blink → 'cursor' or 'click' (based on position)")
-    print("\nWEBSOCKET OUTPUT:")
-    print("  - Continuous: 'cursor' command with x,y position")
-    print("  - Mouth action: 'select' or 'click' (rate limited)")
-    print("  - Mode changes: 'mode_cursor_click', 'mode_move', 'mode_stagerotate'")
+    print("\nWEBSOCKET COMMANDS:")
+    print("  - cursor: continuous position updates (default mode)")
+    print("  - select: mouth open outside click zone")
+    print("  - click: mouth open or double blink in click zone")
+    print("  - stagerotate: mode switched to stage rotation")
     print("\nKEYS:")
     print("  'c' - Calibrate (4 directions + neutral)")
     print("  's' / 'l' - Save / load calibration")
@@ -758,9 +764,9 @@ async def main_loop():
             
             if brow_up != prev_brow_up:
                 if brow_up:
-                    # Brow cycles mode
-                    current_mode = (current_mode + 1) % 3
-                    await broadcast_command(f"mode_{mode_names[current_mode].replace('/', '_')}")
+                    # Brow toggles between cursor and stagerotate mode
+                    current_mode = (current_mode + 1) % 2
+                    await broadcast_command(mode_names[current_mode])
                     print(f"\n[Mode switched to: {mode_names[current_mode]}]")
                 # No brow_down command
                 prev_brow_up = brow_up
