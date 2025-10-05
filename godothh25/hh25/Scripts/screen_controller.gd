@@ -10,11 +10,22 @@ extends Node3D
 # Preload the shapes you want to insert
 const SphereScene = preload("res://Scenes/sphere.tscn")
 const CubeScene = preload("res://Scenes/cube.tscn")
+const PrismScene = preload("res://Scenes/diamond.tscn")
+const CreationSprite = preload("res://creation.png")
+const MovementSprite = preload("res://movement.webp")
+const RotationSprite = preload("res://rotation.webp")
+const blueSprite = preload("res://blue.webp")
+const blackSprite = preload("res://black.webp")
+const redSprite = preload("res://red.webp")
+const greenSprite = preload("res://green.webp")
+const whiteSprite = preload("res://white.webp")
 
+@onready var StatusSprite = $CanvasLayer/Status/StatusSprite
+@onready var ColorWheel = $CanvasLayer/ColorWheel
+@onready var ShapesBox = $CanvasLayer/ShapesBox
 @onready var cursor: TextureRect = $CanvasLayer/Cursor
 @onready var baseParent:Node3D = $Parent
 # Get a reference to the active camera.
-@onready var debugBox:TextEdit = $CanvasLayer/DebugBox
 @onready var camera: Camera3D = get_viewport().get_camera_3d()
 var targetPosition: Vector3
 var targetBasis: Basis
@@ -24,10 +35,15 @@ var previousCommand:String=""
 @export var lerpCoeff:float = 4.0
 @export var slerpCoeff = 4.0
 @export var zDistance:float=1.0
-@export var zSpeed: float = 0.02
-@export var rotateSpeed: float = 0.02
-@export var moveSpeed: float = 0.02
+@export var zSpeed: float = 0.04
+@export var rotateSpeed: float = 0.04
+@export var moveSpeed: float = 0.04
+@export var scaleSpeed: float = 0.02
 var originalPosition:Vector3
+
+
+
+var showColorWheel:bool = false
 # WebSocket client instance
 var _ws_client = WebSocketPeer.new()
 var _is_connected = false
@@ -37,6 +53,7 @@ var server_url = "ws://localhost:8765"
 func _ready():
 	print("Attempting to connect to vision server...")
 	# Attempt to connect to the WebSocket server
+	StatusSprite.texture = CreationSprite
 	targetPosition = camera.position
 	targetBasis = camera.global_transform.basis
 	originalPosition = camera.global_position
@@ -52,15 +69,18 @@ func RESET():
 	var childs = baseParent.get_children()
 	for c in childs:
 		c.queue_free()
+	currentShape = null
+	showColorWheel=false
+	ColorWheel.visible = showColorWheel
+	ShapesBox.visible = !showColorWheel
 	
 
 func removeRecentNode():
 	if(nodesList.size()>0):
 		var lastElem = nodesList.pop_back()
 		lastElem.queue_free()
+	currentShape = null
 func _process(_delta):
-	if(currentShape!=null):
-		debugBox.text = currentShape.name
 	# We must poll the connection state
 	_ws_client.poll()
 	var state = _ws_client.get_ready_state()
@@ -79,7 +99,7 @@ func _process(_delta):
 			var packet = _ws_client.get_packet()
 			# Packets are byte arrays, so we need to convert to string
 			var packet_string = packet.get_string_from_utf8()
-			print("Received message: ", packet_string)
+			#print("Received message: ", packet_string)
 			_handle_command(packet_string)
 
 	elif state == WebSocketPeer.STATE_CLOSING:
@@ -108,9 +128,9 @@ func _handle_command(command_string: String):
 	var command = parsed_json.get("command", "none")
 
 	# Use a match statement to handle different commands
-	print("COM RUN:",command)
 	match command:
 		"insert":
+			
 			if !checkCommandCompatibility(command):
 				return
 			var shape: String = parsed_json.get("shape", "none")
@@ -118,8 +138,10 @@ func _handle_command(command_string: String):
 				remove_child(currentShape)
 			if(shape=="sphere"):
 				currentShape = SphereScene.instantiate()
-			if(shape=="cube"):
+			elif (shape=="cube"):
 				currentShape = CubeScene.instantiate()
+			elif (shape=="prism"):
+				currentShape = PrismScene.instantiate()
 			
 			if (previousCommand == "insert" && currentShape.position == Vector3(0,0,10)):
 				return
@@ -139,13 +161,33 @@ func _handle_command(command_string: String):
 			if !checkCommandCompatibility(command):
 				return
 			var z:float = float(parsed_json.get("z", "0.0"))
+			var y = float(parsed_json.get("y","0.0"))
 			pushObjectBack(z)
 			nodesList.append(currentShape)
-			currentShape=null
+			showColorWheel = true
+			ColorWheel.visible = true
+			ShapesBox.visible = false
 			previousCommand = command
 		
+		"setColor":
+			var color = parsed_json.get("color","white")
+			var mesh_instance = currentShape.get_node("MeshInstance3D")
+			var new_material = StandardMaterial3D.new()
+
+
+
+			new_material.albedo_color = getColor(color)
+
+
+			mesh_instance.material_override = new_material
+			
+			showColorWheel = false
+			ColorWheel.visible = false
+			ShapesBox.visible = true
+		
 		"cursor":
-			debugBox.text="Cursor"
+			if(StatusSprite.texture != CreationSprite):
+				StatusSprite.texture = CreationSprite
 			var xper:float = float(parsed_json.get("x", "0.0"))/100
 			var yper:float = float(parsed_json.get("y", "0.0"))/100
 			var currentViewport = get_viewport().size
@@ -156,8 +198,8 @@ func _handle_command(command_string: String):
 					currentShape.global_position = get_world_coords_on_camera_plane(screen_coords)
 				elif (previousCommand=="selectXY"):
 					var signZ=getSign(xper*100)
-					print("SIGN:",signZ)
 					pushObjectBack((signZ*-1*zSpeed))
+					scaleObject(-1*getSign(yper*100))
 		"select":
 			if previousCommand=="insert":
 				_handle_command(JSON.stringify({
@@ -177,9 +219,11 @@ func _handle_command(command_string: String):
 			var currentViewport = get_viewport().size
 			var screen_coords = Vector2(currentViewport.x * xper, currentViewport.y * yper)
 			cursor.position = screen_coords
+			print("SIMULATED CLICK")
 			simulate_click(screen_coords)
 		"move":
-			print("ENTERED MOVE")
+			if(StatusSprite.texture != MovementSprite):
+				StatusSprite.texture = MovementSprite
 			var mx: float = float(parsed_json.get("x",0.0))
 			var my: float = float(parsed_json.get("y",0.0))
 			var currentViewport = get_viewport().size
@@ -192,13 +236,15 @@ func _handle_command(command_string: String):
 			var directionZ = -camera.global_transform.basis.z
 			var directionY = -camera.global_transform.basis.y
 			var directionX = camera.global_transform.basis.x
-			print("WHERE ARE THE NUMBERS: ",directionY*yv + directionX*xv)
+
 			targetPosition += directionY*yv + directionX*xv
 		"stagerotate":
+			if(StatusSprite.texture != RotationSprite):
+				StatusSprite.texture = RotationSprite
 			var rx: float = float(parsed_json.get("x",0.0)) 
 			var ry: float = float(parsed_json.get("y",0.0))
 			var currentViewport = get_viewport().size
-			var screen_coords = Vector2(currentViewport.x * rx, currentViewport.y * ry)
+			var screen_coords = Vector2(currentViewport.x * rx, currentViewport.y * ry) *0.01
 			cursor.position = screen_coords
 			var signX=getSign(rx)
 			var signY=getSign(ry)
@@ -209,7 +255,21 @@ func _handle_command(command_string: String):
 		_:
 			print("Received unknown command: ", command)
 	
-		
+
+func getColor(color:String):
+	match color:
+		"red":
+			return Color.RED
+		"green":
+			return Color.GREEN
+		"blue":
+			return Color.BLUE
+		"black":
+			return Color.BLACK
+		"white":
+			return Color.WHITE
+		_ :
+			return Color.BLACK
 		
 func checkCommandCompatibility(command: String):
 	match command:
@@ -229,6 +289,13 @@ func checkCommandCompatibility(command: String):
 			pass
 	return true
 	
+
+func scaleObject(val:float):
+	if(val==1):
+		currentShape.scale += Vector3.ONE * scaleSpeed
+	elif(val==-1):
+		currentShape.scale -= Vector3.ONE * scaleSpeed
+
 	
 func shapeNullCheck():
 	if (nextShape!=null):
@@ -238,7 +305,6 @@ func killProgram():
 	get_tree().quit()
 
 func getSign(val:float):
-	print("WHATS THE FUCKING SIGN", val)
 	if(val>75):
 		return 1
 	elif val<25:
@@ -258,7 +324,6 @@ func get_world_coords_on_z0_plane(screen_pos: Vector2) -> Vector3:
 
 
 	var target_plane = Plane(Vector3.FORWARD, zDistance)
-	print(target_plane)
 	# 2. Get the ray's origin and direction from the camera.
 	var ray_origin: Vector3 = camera.project_ray_origin(screen_pos)
 	var ray_direction: Vector3 = camera.project_ray_normal(screen_pos)
@@ -346,7 +411,7 @@ func _on_sphere_button_down() -> void:
 func _on_diamond_button_down() -> void:
 	var com = JSON.stringify({
 		"command":"insert",
-		"shape": "diamond"
+		"shape": "prism"
 	})
 	_handle_command(com)
 
@@ -359,3 +424,43 @@ func _on_cube_button_down() -> void:
 	})
 	_handle_command(com)
 	
+
+
+func _on_green_button_down() -> void:
+	var com = JSON.stringify({
+		"command":"setColor",
+		"color": "green"
+	})
+	_handle_command(com)
+
+
+func _on_blue_button_down() -> void:
+	var com = JSON.stringify({
+		"command":"setColor",
+		"color": "blue"
+	})
+	_handle_command(com)
+
+
+func _on_black_button_down() -> void:
+	var com = JSON.stringify({
+		"command":"setColor",
+		"color": "black"
+	})
+	_handle_command(com)
+
+
+func _on_white_button_down() -> void:
+	var com = JSON.stringify({
+		"command":"setColor",
+		"color": "white"
+	})
+	_handle_command(com)
+
+
+func _on_red_button_down() -> void:
+	var com = JSON.stringify({
+		"command":"setColor",
+		"color": "red"
+	})
+	_handle_command(com)
