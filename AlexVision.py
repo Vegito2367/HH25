@@ -426,12 +426,16 @@ async def broadcast_cursor(x_percent, y_percent):
         connected_clients.discard(client)
 
 
-async def broadcast_command(command_name):
-    """Send a simple command to all connected clients."""
-    if not connected_clients:
-        return
+async def broadcast_command(command_name, x_percent, y_percent):
+    """Send a command with coordinates to all connected clients."""
+    command = {
+        "command": command_name,
+        "x": f"{x_percent:.2f}",
+        "y": f"{y_percent:.2f}"
+    }
     
-    command = {"command": command_name}
+    if not connected_clients:
+        return command
     
     # Send to all connected clients
     disconnected = set()
@@ -444,6 +448,8 @@ async def broadcast_command(command_name):
     # Remove disconnected clients
     for client in disconnected:
         connected_clients.discard(client)
+    
+    return command
 
 
 async def websocket_server():
@@ -748,13 +754,14 @@ async def main_loop():
                 if mouth_open:
                     # Check if enough time has passed since last select/click
                     if current_time - last_select_click_time >= SELECT_CLICK_COOLDOWN:
+                        x_percent = (cursor_x / w) * 100.0
                         y_percent = (cursor_y / h) * 100.0
                         if y_percent >= 85.0:
-                            await broadcast_command("click")
-                            print(f"\n[Click sent at y={y_percent:.1f}%]")
+                            cmd = await broadcast_command("click", x_percent, y_percent)
+                            print(f"\n[WS] {json.dumps(cmd)}")
                         else:
-                            await broadcast_command("select")
-                            print(f"\n[Select sent at y={y_percent:.1f}%]")
+                            cmd = await broadcast_command("select", x_percent, y_percent)
+                            print(f"\n[WS] {json.dumps(cmd)}")
                         last_select_click_time = current_time
                     else:
                         # Cooldown still active
@@ -764,20 +771,37 @@ async def main_loop():
             
             if brow_up != prev_brow_up:
                 if brow_up:
+                    # Eyebrows just went up - start timer
+                    brow_up_start_time = current_time
+                    brow_triggered = False
+                else:
+                    # Eyebrows went down - reset timer
+                    brow_up_start_time = None
+                    brow_triggered = False
+                prev_brow_up = brow_up
+            
+            # Check if eyebrows have been held up long enough
+            if brow_up and brow_up_start_time is not None and not brow_triggered:
+                hold_duration = current_time - brow_up_start_time
+                if hold_duration >= BROW_HOLD_TIME:
                     # Brow toggles between cursor and stagerotate mode
                     current_mode = (current_mode + 1) % 2
-                    await broadcast_command(mode_names[current_mode])
-                    print(f"\n[Mode switched to: {mode_names[current_mode]}]")
-                # No brow_down command
-                prev_brow_up = brow_up
+                    x_percent = (cursor_x / w) * 100.0
+                    y_percent = (cursor_y / h) * 100.0
+                    cmd = await broadcast_command(mode_names[current_mode], x_percent, y_percent)
+                    print(f"\n[WS] {json.dumps(cmd)}")
+                    brow_triggered = True  # Prevent re-triggering while held
             
             if double_blink and not prev_double_blink:
                 # Double blink sends cursor or click based on y position
+                x_percent = (cursor_x / w) * 100.0
                 y_percent = (cursor_y / h) * 100.0
                 if y_percent >= 85.0:
-                    await broadcast_command("click")
+                    cmd = await broadcast_command("click", x_percent, y_percent)
+                    print(f"\n[WS] {json.dumps(cmd)}")
                 else:
-                    await broadcast_command("cursor")
+                    cmd = await broadcast_command("cursor", x_percent, y_percent)
+                    print(f"\n[WS] {json.dumps(cmd)}")
             prev_double_blink = double_blink
             
             # Draw deadzone indicator
