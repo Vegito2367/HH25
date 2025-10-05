@@ -47,8 +47,8 @@ func _ready():
 		print("Connection initiated.")
 
 func RESET():
-	camera.global_position = originalPosition
 	baseParent.rotation = Vector3.ZERO
+	targetPosition = originalPosition
 	var childs = baseParent.get_children()
 	for c in childs:
 		c.queue_free()
@@ -179,12 +179,11 @@ func _handle_command(command_string: String):
 			cursor.position = screen_coords
 			simulate_click(screen_coords)
 		"move":
-
+			print("ENTERED MOVE")
 			var mx: float = float(parsed_json.get("x",0.0))
 			var my: float = float(parsed_json.get("y",0.0))
 			var currentViewport = get_viewport().size
 			var screen_coords = Vector2(currentViewport.x * mx, currentViewport.y * my) *0.01
-			debugBox.text = str(screen_coords)
 			cursor.position = screen_coords
 			var mz: float = float(parsed_json.get("z",0.0))
 			var xv = getSign(mx) * moveSpeed
@@ -193,6 +192,7 @@ func _handle_command(command_string: String):
 			var directionZ = -camera.global_transform.basis.z
 			var directionY = -camera.global_transform.basis.y
 			var directionX = camera.global_transform.basis.x
+			print("WHERE ARE THE NUMBERS: ",directionY*yv + directionX*xv)
 			targetPosition += directionY*yv + directionX*xv
 		"stagerotate":
 			var rx: float = float(parsed_json.get("x",0.0)) 
@@ -238,6 +238,7 @@ func killProgram():
 	get_tree().quit()
 
 func getSign(val:float):
+	print("WHATS THE FUCKING SIGN", val)
 	if(val>75):
 		return 1
 	elif val<25:

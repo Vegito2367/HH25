@@ -66,17 +66,17 @@ async def socketTest(websocket):
                 elif key_input == 'j':  # eye click
                     command_to_send = {"command": "selectZ", "z":str(z)}
                 elif key_input == 'w':
-                    command_to_send = {"command":"move", "x":0, "y":0, "z":77}
+                    command_to_send = {"command":"move", "x":0, "y":0, "z":88}
                 elif key_input == 'W':
-                    command_to_send = {"command":"move", "x":0, "y":0, "z":25}
+                    command_to_send = {"command":"move", "x":0, "y":0, "z":11}
                 elif key_input == 'a':
-                    command_to_send = {"command":"move", "x":77, "y":0, "z":0}
+                    command_to_send = {"command":"move", "x":88, "y":0, "z":0}
                 elif key_input == 'A':
-                    command_to_send = {"command":"move", "x":25, "y":0, "z":0}
+                    command_to_send = {"command":"move", "x":11, "y":0, "z":0}
                 elif key_input == 's':
-                    command_to_send = {"command":"move", "x":0, "y":77, "z":0}
+                    command_to_send = {"command":"move", "x":0, "y":88, "z":0}
                 elif key_input == 'S':
-                    command_to_send = {"command":"move", "x":0, "y":25, "z":0}
+                    command_to_send = {"command":"move", "x":0, "y":11, "z":0}
                 elif key_input == 'r':
                     command_to_send = {"command":"stagerotate", "x":0, "y":60}
                 elif key_input == 'R':
