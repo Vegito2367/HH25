@@ -73,6 +73,7 @@ transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 0, -1.2781)
 mesh = SubResource("PlaneMesh_3a071")
 
 [node name="Parent" type="Node3D" parent="."]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 0, -1.3886)
 
 [connection signal="button_down" from="CanvasLayer/MarginContainer/HBoxContainer/Cube" to="." method="_on_cube_button_down"]
 [connection signal="button_down" from="CanvasLayer/MarginContainer/HBoxContainer/Sphere" to="." method="_on_sphere_button_down"]
