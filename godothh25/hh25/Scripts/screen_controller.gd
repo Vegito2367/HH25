@@ -24,9 +24,9 @@ var previousCommand:String=""
 @export var lerpCoeff:float = 4.0
 @export var slerpCoeff = 4.0
 @export var zDistance:float=1.0
-@export var zSpeed: float = 1
-@export var rotateSpeed: float = 0.5
-@export var moveSpeed: float = 0.5
+@export var zSpeed: float = 0.02
+@export var rotateSpeed: float = 0.02
+@export var moveSpeed: float = 0.02
 # WebSocket client instance
 var _ws_client = WebSocketPeer.new()
 var _is_connected = false
@@ -162,6 +162,9 @@ func _handle_command(command_string: String):
 		"move":
 			var mx: float = float(parsed_json.get("x",0.0))
 			var my: float = float(parsed_json.get("y",0.0))
+			var currentViewport = get_viewport().size
+			var screen_coords = Vector2(currentViewport.x * mx, currentViewport.y * my)
+			cursor.position = screen_coords
 			var mz: float = float(parsed_json.get("z",0.0))
 			var xv = getSign(mx) * moveSpeed
 			var yv = getSign(my) * moveSpeed
@@ -173,6 +176,9 @@ func _handle_command(command_string: String):
 		"stagerotate":
 			var rx: float = float(parsed_json.get("x",0.0)) 
 			var ry: float = float(parsed_json.get("y",0.0))
+			var currentViewport = get_viewport().size
+			var screen_coords = Vector2(currentViewport.x * rx, currentViewport.y * ry)
+			cursor.position = screen_coords
 			var signX=getSign(rx)
 			var signY=getSign(ry)
 			
@@ -212,9 +218,9 @@ func killProgram():
 
 func getSign(val:float):
 	print("WHAT THE FUCK IS THIS SIGN:",val)
-	if(val>70):
+	if(val>75):
 		return 1
-	elif val<30:
+	elif val<25:
 		return -1
 	else:
 		return 0

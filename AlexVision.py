@@ -531,7 +531,7 @@ async def main_loop():
     
     # Mode cycling: 0=cursor, 1=move, 2=stagerotate
     current_mode = 0
-    mode_names = ["cursor", "move", "stagerotate"]
+    mode_names = ["cursor", "move", "cursor"]
     
     params = {
         "vmax_x": VMAX_X,
