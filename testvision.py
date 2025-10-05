@@ -20,6 +20,8 @@ def random_between(m, n):
 async def socketTest(websocket):
     print("Godot client connected!")
     try:
+        xprec=10
+        yprec=10
         while True:
             command_to_send = None
             if select.select([sys.stdin], [], [], 0)[0]:
@@ -32,6 +34,7 @@ async def socketTest(websocket):
                 buttony=85
                 sphx=45
                 diamondx=65
+                
                 z = random_between(2,10)
                 if key_input == 'q':  # Quit
                     break
@@ -42,12 +45,31 @@ async def socketTest(websocket):
                 elif key_input == 'z':
                     command_to_send = {"command": "select"}
                 elif key_input == 'm':  # eye movement
-                    command_to_send = {"command": "cursor", "x": str(xper), "y": str(yper) }
+                    command_to_send = {"command": "cursor", "x": xprec+10, "y": yprec+10 }
+                    xprec+=10
+                    yprec+=10
+                elif key_input == 'M':  # eye movement
+                    command_to_send = {"command": "cursor", "x": yprec-10, "y": yprec-10 }
+                    xprec-=10
+                    yprec-=10
+                elif key_input=='p':
+                    command_to_send = {"command": "cursor", "x": 65, "y": 25 }
+                elif key_input=='P':
+                    command_to_send = {"command": "cursor", "x": -65, "y": 25 }
                 elif key_input == 'n':  # eye click
                     command_to_send = {"command": "cursor", "x": str(xper), "y": str(yper) }
                     command_to_send = {"command": "click", "x": str(xper), "y": str(yper)}
                 elif key_input == 'j':  # eye click
                     command_to_send = {"command": "selectZ", "z":str(z)}
+                elif key_input == 'w':
+                    command_to_send = {"command":"move", "mx":0, "my":0, "mz":1}
+                elif key_input == 'W':
+                    command_to_send = {"command":"move", "mx":0, "my":0, "mz":-1}
+                elif key_input == 'r':
+                    command_to_send = {"command":"selfrotate", "rx":0, "ry":60}
+                elif key_input == 'R':
+                    command_to_send = {"command":"selfrotate", "rx":0, "ry":-60}
+                
             if command_to_send:
                 await websocket.send(json.dumps(command_to_send))
                 print(f"Sent: {command_to_send}")           

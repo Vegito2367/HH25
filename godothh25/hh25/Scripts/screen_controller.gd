@@ -15,22 +15,27 @@ const CubeScene = preload("res://Scenes/cube.tscn")
 
 # Get a reference to the active camera.
 @onready var camera: Camera3D = get_viewport().get_camera_3d()
-
+var targetPosition: Vector3
+var targetBasis: Basis
 var nextShape
 var currentShape = null
 var previousCommand:String=""
-
+@export var lerpCoeff:float = 4.0
+@export var slerpCoeff = 4.0
 @export var zDistance:float=1.0
+@export var zSpeed: float = 1
 # WebSocket client instance
 var _ws_client = WebSocketPeer.new()
 var _is_connected = false
-
+var MOUTHMODE:bool = true 
 # The address of the Python server
 var server_url = "ws://localhost:8765"
 
 func _ready():
 	print("Attempting to connect to vision server...")
 	# Attempt to connect to the WebSocket server
+	targetPosition = camera.position
+	targetBasis = camera.global_transform.basis
 	var err = _ws_client.connect_to_url(server_url)
 	if err != OK:
 		print("Error connecting to server.")
@@ -63,8 +68,9 @@ func _process(_delta):
 			_is_connected = false
 			print("Connection to vision server lost.")
 			killProgram()
-		# Optional: Add retry logic here
-		pass
+	
+	camera.global_position = camera.global_position.lerp(targetPosition, lerpCoeff * _delta)
+	camera.global_transform.basis = camera.global_transform.basis.slerp(targetBasis, slerpCoeff * _delta)
 
 
 # This function parses the incoming message and calls the appropriate 3D action
@@ -98,14 +104,14 @@ func _handle_command(command_string: String):
 		"selectXY":
 			checkCommandCompatibility(command)
 			var screen_coords = cursor.position
-			var world_coords = get_world_coords_on_z0_plane(screen_coords)
+			var world_coords = get_world_coords_on_camera_plane(screen_coords)
 			currentShape.position = world_coords
 			previousCommand = command
 		
 		"selectZ":
 			checkCommandCompatibility(command)
 			var z:float = float(parsed_json.get("z", "0.0"))
-			currentShape.position.z = z
+			pushObjectBack(z)
 			currentShape=null
 			previousCommand = command
 		
@@ -117,9 +123,9 @@ func _handle_command(command_string: String):
 			cursor.position = screen_coords
 			if(currentShape!=null):
 				if(previousCommand=="insert"):
-					currentShape.position = get_world_coords_on_z0_plane(screen_coords)
+					currentShape.position = get_world_coords_on_camera_plane(screen_coords)
 				elif (previousCommand=="selectXY"):
-					currentShape.position.z = -0.01*cursor.position.x
+					pushObjectBack((sign(cursor.position.x - 50)*-1*zSpeed))
 		"select":
 			if previousCommand=="insert":
 				_handle_command(JSON.stringify({
@@ -131,7 +137,7 @@ func _handle_command(command_string: String):
 			elif previousCommand=="selectXY":
 				_handle_command(JSON.stringify({
 					"command":"selectZ",
-					"z": -0.01*cursor.position.x,
+					"z": (sign(cursor.position.x - 50)*-1*zSpeed),
 				}))
 		"click":
 			var xper:float = float(parsed_json.get("x", "0.0"))/100
@@ -140,12 +146,20 @@ func _handle_command(command_string: String):
 			var screen_coords = Vector2(currentViewport.x * xper, currentViewport.y * yper)
 			cursor.position = screen_coords
 			simulate_click(screen_coords)
-		"scale":
-			# TODO: Implement scaling logic
-			print("Received 'scale' command (not yet implemented).")
-		"rotate":
-			# TODO: Implement rotation logic
-			print("Received 'rotate' command (not yet implemented).")
+		"move":
+			var mx: float = float(parsed_json.get("mx",0.0))
+			var my: float = float(parsed_json.get("my",0.0))
+			var mz: float = float(parsed_json.get("mz",0.0))
+			var directionZ = -camera.global_transform.basis.z
+			var directionY = -camera.global_transform.basis.y
+			var directionX = -camera.global_transform.basis.x
+			targetPosition += directionZ*mz + directionY*my + directionX*mx
+		"selfrotate":
+			var rx: float = float(parsed_json.get("rx",0.0)) * PI/180
+			var ry: float = float(parsed_json.get("ry",0.0)) * PI/180
+			var current_roll = camera.global_transform.basis.get_euler()
+			var target_euler = Vector3(current_roll.x+rx, current_roll.y + ry, current_roll.z)
+			targetBasis = Basis.from_euler(target_euler)
 		_:
 			print("Received unknown command: ", command)
 	
@@ -174,7 +188,15 @@ func shapeNullCheck():
 func killProgram():
 	get_tree().quit()
 	
-
+func pushObjectBack(z:float):
+	print("PREVIOUS POSITION:", currentShape.position)
+	var prevpos = currentShape.position
+	var zDirectionFromCamera = camera.global_transform.basis.z
+	var yDirectionFromCamera = camera.global_transform.basis.y
+	var xDirectionFromCamera = camera.global_transform.basis.x
+	currentShape.position += (zDirectionFromCamera) * z
+	print("UPDATED POSITION:",currentShape.position)
+	print("VECTOR:", currentShape.position-prevpos)
 
 func get_world_coords_on_z0_plane(screen_pos: Vector2) -> Vector3:
 	# Ensure the camera is available.
@@ -200,6 +222,38 @@ func get_world_coords_on_z0_plane(screen_pos: Vector2) -> Vector3:
 	else:
 		print("Error: Camera ray does not intersect the Z=0 plane.")
 		# Return a sensible default or handle the error.
+		return Vector3.ZERO
+		
+func get_world_coords_on_camera_plane(screen_pos: Vector2) -> Vector3:
+	if not camera:
+		return Vector3.ZERO
+
+	# 1. The plane's normal is the camera's forward direction.
+	# The -Z axis is forward in Godot, making the plane's normal face the camera.
+	var plane_normal: Vector3 = -camera.global_transform.basis.z
+
+	# 2. Calculate a point on the plane.
+	# Start at the camera's position and move `distance_from_camera` units forward.
+	var point_on_plane: Vector3 = camera.global_position + (plane_normal * zDistance)
+
+	# 3. Create the plane object.
+	# The constructor takes the normal and the distance from the WORLD ORIGIN (d).
+	# We can calculate 'd' using the dot product of the normal and a point on the plane.
+	var d = plane_normal.dot(point_on_plane)
+	var target_plane = Plane(plane_normal, d)
+
+	# 4. Get the ray from the camera as before.
+	var ray_origin: Vector3 = camera.project_ray_origin(screen_pos)
+	var ray_direction: Vector3 = camera.project_ray_normal(screen_pos)
+
+	# 5. Calculate the intersection point on our new dynamic plane.
+	var intersection_point: Vector3 = target_plane.intersects_ray(ray_origin, ray_direction)
+
+	if intersection_point != null:
+		return intersection_point
+	else:
+		# This error is less likely now but still good practice to keep.
+		print("Error: Camera ray does not intersect the plane.")
 		return Vector3.ZERO
 		
 func simulate_click(screen_coords: Vector2):
