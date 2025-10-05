@@ -147,16 +147,16 @@ func _handle_command(command_string: String):
 			cursor.position = screen_coords
 			simulate_click(screen_coords)
 		"move":
-			var mx: float = float(parsed_json.get("mx",0.0))
-			var my: float = float(parsed_json.get("my",0.0))
-			var mz: float = float(parsed_json.get("mz",0.0))
+			var mx: float = float(parsed_json.get("x",0.0))
+			var my: float = float(parsed_json.get("y",0.0))
+			var mz: float = float(parsed_json.get("z",0.0))
 			var directionZ = -camera.global_transform.basis.z
 			var directionY = -camera.global_transform.basis.y
 			var directionX = -camera.global_transform.basis.x
 			targetPosition += directionZ*mz + directionY*my + directionX*mx
-		"selfrotate":
-			var rx: float = float(parsed_json.get("rx",0.0)) * PI/180
-			var ry: float = float(parsed_json.get("ry",0.0)) * PI/180
+		"stagerotate":
+			var rx: float = float(parsed_json.get("x",0.0)) * PI/180
+			var ry: float = float(parsed_json.get("y",0.0)) * PI/180
 			var current_roll = camera.global_transform.basis.get_euler()
 			var target_euler = Vector3(current_roll.x+rx, current_roll.y + ry, current_roll.z)
 			targetBasis = Basis.from_euler(target_euler)

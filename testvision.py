@@ -62,13 +62,13 @@ async def socketTest(websocket):
                 elif key_input == 'j':  # eye click
                     command_to_send = {"command": "selectZ", "z":str(z)}
                 elif key_input == 'w':
-                    command_to_send = {"command":"move", "mx":0, "my":0, "mz":1}
+                    command_to_send = {"command":"move", "x":0, "y":0, "z":1}
                 elif key_input == 'W':
-                    command_to_send = {"command":"move", "mx":0, "my":0, "mz":-1}
+                    command_to_send = {"command":"move", "x":0, "y":0, "z":-1}
                 elif key_input == 'r':
-                    command_to_send = {"command":"selfrotate", "rx":0, "ry":60}
+                    command_to_send = {"command":"stagerotate", "x":0, "y":60}
                 elif key_input == 'R':
-                    command_to_send = {"command":"selfrotate", "rx":0, "ry":-60}
+                    command_to_send = {"command":"stagerotate", "x":0, "y":-60}
                 
             if command_to_send:
                 await websocket.send(json.dumps(command_to_send))
