@@ -28,7 +28,7 @@ BROW_HOLD_TIME = 0.65       # seconds eyebrows must be held up to trigger delete
 MOUTH_OPEN_THRESH = 0.38    # mouth-aspect-ratio threshold for open/close
 BLINK_EAR_THRESH = 0.22     # raised a bit so blinks register sooner
 BLINK_MIN_FRAMES = 1        # count blink if eyes closed for >= 1 frame
-TRIPLE_BLINK_WINDOW = 1.0   # seconds window for three blinks to cycle mode
+TRIPLE_BLINK_WINDOW = 1.2   # seconds window for three blinks to cycle mode
 TRIPLE_BLINK_HOLD = 0.2     # seconds to hold the output flag = True
 
 CALIB_FILE = "simple_head_calib.json"
@@ -695,11 +695,31 @@ async def main_loop():
                 
                 if is_blink and not blink_active:
                     t = time.time()
+                    
+                    # Remove old blinks outside the time window
+                    while blink_times and (t - blink_times[0]) > TRIPLE_BLINK_WINDOW:
+                        blink_times.popleft()
+                    
+                    # Add current blink
                     blink_times.append(t)
+                    
+                    # Log blink timing
+                    if len(blink_times) >= 2:
+                        time_since_last = t - blink_times[-2]
+                        print(f"[Blink detected] Count: {len(blink_times)}, Time since last: {time_since_last:.3f}s")
+                    else:
+                        print(f"[Blink detected] Count: 1 (starting new sequence)")
+                    
+                    # Check if we have 3 blinks within the window
                     if len(blink_times) >= 3:
-                        # Check if first and third blink are within the time window
-                        if (blink_times[-1] - blink_times[-3]) <= TRIPLE_BLINK_WINDOW:
+                        # Check if first and third blink are within window
+                        time_span = blink_times[-1] - blink_times[-3]
+                        if time_span <= TRIPLE_BLINK_WINDOW:
                             triple_blink_until = t + TRIPLE_BLINK_HOLD
+                            print(f"[TRIPLE BLINK DETECTED] All 3 blinks in {time_span:.3f}s")
+                        else:
+                            print(f"[Blink timing] 3 blinks but too slow: {time_span:.3f}s > {TRIPLE_BLINK_WINDOW}s")
+                    
                     blink_active = True
                 
                 if not is_blink and blink_active:
