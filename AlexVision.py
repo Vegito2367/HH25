@@ -23,12 +23,13 @@ YAW_SMOOTHING = 0.3     # Smoothing factor for yaw (0-1, higher = more smoothing
 
 # Face gesture detection config
 BROW_BASELINE_FRAMES = 60   # frames to learn neutral brow distance
-BROW_UP_FACTOR = 0.12       # lowered: easier to trigger brow_up
+BROW_UP_FACTOR = 0.20       # increased: requires more eyebrow movement to trigger
+BROW_HOLD_TIME = 0.65       # seconds eyebrows must be held up to trigger delete
 MOUTH_OPEN_THRESH = 0.38    # mouth-aspect-ratio threshold for open/close
 BLINK_EAR_THRESH = 0.22     # raised a bit so blinks register sooner
 BLINK_MIN_FRAMES = 1        # count blink if eyes closed for >= 1 frame
-DOUBLE_BLINK_WINDOW = 0.6   # seconds between two blinks to count as double
-DOUBLE_BLINK_HOLD = 0.2     # seconds to hold the output flag = True
+TRIPLE_BLINK_WINDOW = 1.4   # seconds window for three blinks to cycle mode
+TRIPLE_BLINK_HOLD = 0.2     # seconds to hold the output flag = True
 
 CALIB_FILE = "simple_head_calib.json"
 
@@ -53,6 +54,7 @@ L_EYE_INNER, R_EYE_INNER = 133, 362
 WS_HOST = 'localhost'
 WS_PORT = 8765
 WS_UPDATE_RATE = 0.03  # Send updates every 30ms (~33 FPS)
+SELECT_CLICK_COOLDOWN = 2.0  # Minimum seconds between select/click commands
 
 # Global variable to store connected WebSocket clients
 connected_clients = set()
@@ -331,8 +333,8 @@ def run_calibration(cap, frame_shape):
     
     calib["rom_yaw"] = rom_yaw
     calib["rom_roll"] = rom_roll
-    calib["deadzone_yaw"] = max(2.0, 0.15 * rom_yaw)  # Lower minimum deadzone
-    calib["deadzone_roll"] = max(5.0, 0.15 * rom_roll)
+    calib["deadzone_yaw"] = max(8.0, 0.25 * rom_yaw)  # Larger minimum deadzone
+    calib["deadzone_roll"] = max(8.0, 0.25 * rom_roll)
     
     print("\n[CALIBRATION COMPLETE]")
     print(f"  Neutral: yaw={yaw0:.1f}, roll={roll0:.1f}°")
@@ -360,12 +362,12 @@ def update_velocity_constant(dyaw, droll, params, v_cmd_prev, dt):
     
     # X-axis (yaw) - NO LONGER INVERTED
     if abs(dyaw) > deadzone_yaw + hysteresis:
-        v_target_x = vmax_x * np.sign(dyaw)  # REMOVED NEGATIVE SIGN
+        v_target_x = vmax_x * np.sign(dyaw)
     elif abs(dyaw) < deadzone_yaw:
         v_target_x = 0.0
     else:
         if abs(v_cmd_prev[0]) > 1e-3:
-            v_target_x = vmax_x * np.sign(v_cmd_prev[0])  # REMOVED NEGATIVE SIGN
+            v_target_x = vmax_x * np.sign(v_cmd_prev[0])
     
     # Y-axis (roll)
     if abs(droll) > deadzone_roll + hysteresis:
@@ -399,13 +401,14 @@ async def handle_client(websocket):
         print(f"Client disconnected. Total clients: {len(connected_clients)}")
 
 
-async def broadcast_cursor(x_percent, y_percent):
+async def broadcast_cursor(x_percent, y_percent, mode_name):
     """Send cursor position to all connected clients."""
     if not connected_clients:
         return
     
+    # Send command based on current mode
     command = {
-        "command": "cursor",
+        "command": mode_name,
         "x": f"{x_percent:.2f}",
         "y": f"{y_percent:.2f}"
     }
@@ -423,14 +426,15 @@ async def broadcast_cursor(x_percent, y_percent):
         connected_clients.discard(client)
 
 
-async def broadcast_command(command_name):
-    """Send a simple command to all connected clients."""
-    if not connected_clients:
-        return
+async def broadcast_command(command_name, x_percent, y_percent):
+    """Send a command with coordinates to all connected clients."""
+    command = {
+        "command": command_name,
+        "x": f"{x_percent:.2f}",
+        "y": f"{y_percent:.2f}"
+    }
     
-    command = {"command": command_name}
-    
-    # Send to all connected clients
+    # Send to all connected clients even if none connected (for logging)
     disconnected = set()
     for client in connected_clients:
         try:
@@ -441,6 +445,8 @@ async def broadcast_command(command_name):
     # Remove disconnected clients
     for client in disconnected:
         connected_clients.discard(client)
+    
+    return command
 
 
 async def websocket_server():
@@ -509,12 +515,23 @@ async def main_loop():
     r_run = 0
     blink_active = False
     blink_times = deque(maxlen=4)
-    double_blink_until = 0.0
+    triple_blink_until = 0.0
     
     # Previous states for edge detection
     prev_mouth_open = False
     prev_brow_up = False
-    prev_double_blink = False
+    prev_triple_blink = False
+    
+    # Brow hold timer
+    brow_up_start_time = None
+    brow_triggered = False
+    
+    # Rate limiting for select/click commands
+    last_select_click_time = 0.0
+    
+    # Mode cycling: 0=cursor, 1=move, 2=stagerotate
+    current_mode = 0
+    mode_names = ["cursor", "move", "cursor"]
     
     params = {
         "vmax_x": VMAX_X,
@@ -541,9 +558,15 @@ async def main_loop():
     print("  - Turn head RIGHT → cursor moves RIGHT")
     print("  - Tilt head (ear to shoulder) → cursor moves up/down")
     print("\nFACE GESTURES:")
-    print("  - Mouth open/close detection")
-    print("  - Eyebrow raise detection")
-    print("  - Double blink detection")
+    print("  - Mouth open → 'select' (or 'click' if in bottom 15%)")
+    print("    * Rate limited: 2 second cooldown between select/click")
+    print("  - Triple blink (3 blinks in 1 sec) → cycles mode (cursor → move → stagerotate)")
+    print("  - Eyebrow raise (hold 0.65s) → 'delete' command")
+    print("\nWEBSOCKET COMMANDS:")
+    print("  - cursor/move/stagerotate: continuous position updates (based on mode)")
+    print("  - select: mouth open outside click zone")
+    print("  - click: mouth open in click zone")
+    print("  - delete: eyebrow raise (hold 0.65s)")
     print("\nKEYS:")
     print("  'c' - Calibrate (4 directions + neutral)")
     print("  's' / 'l' - Save / load calibration")
@@ -586,7 +609,7 @@ async def main_loop():
             # Face gesture states
             mouth_open = False
             brow_up = False
-            double_blink = False
+            triple_blink = False
             
             # Process face
             rgb = cv2.cvtColor(frame, cv2.COLOR_BGR2RGB)
@@ -629,27 +652,36 @@ async def main_loop():
                 mar = mouth_aspect_ratio(landmarks, w, h)
                 mouth_open = mar > MOUTH_OPEN_THRESH
                 
-                # Eyebrow up/down
-                brow_pt = np.array([landmarks[L_BROW].x * w, landmarks[L_BROW].y * h])
-                eye_top_pt = np.array([landmarks[L_EYE_TOP].x * w, landmarks[L_EYE_TOP].y * h])
-                brow_dist = dist(brow_pt, eye_top_pt)
-                
-                l_eye_in = np.array([landmarks[L_EYE_IN].x * w, landmarks[L_EYE_IN].y * h])
-                r_eye_in = np.array([landmarks[R_EYE_IN].x * w, landmarks[R_EYE_IN].y * h])
-                inter_ocular = dist(l_eye_in, r_eye_in) + 1e-6
-                brow_norm = brow_dist / inter_ocular
-                
-                if brow_baseline is None:
-                    brow_samples.append(brow_norm)
-                    if len(brow_samples) == brow_samples.maxlen:
-                        brow_baseline = float(np.median(brow_samples))
-                else:
-                    brow_up = brow_norm >= (brow_baseline * (1.0 + BROW_UP_FACTOR))
-                
-                # Blink detection
+                # Eyebrow up/down (but first check if eyes are open)
+                # Calculate eye aspect ratios first
                 l_ear = eye_aspect_ratio(landmarks, L_EYE_UP, L_EYE_DN, L_EYE_INNER, L_EYE_OUT, w, h)
                 r_ear = eye_aspect_ratio(landmarks, R_EYE_UP, R_EYE_DN, R_EYE_INNER, R_EYE_OUT, w, h)
                 
+                # Only detect eyebrow raise if eyes are open
+                eyes_open = (l_ear > BLINK_EAR_THRESH) and (r_ear > BLINK_EAR_THRESH)
+                
+                if eyes_open:
+                    brow_pt = np.array([landmarks[L_BROW].x * w, landmarks[L_BROW].y * h])
+                    eye_top_pt = np.array([landmarks[L_EYE_TOP].x * w, landmarks[L_EYE_TOP].y * h])
+                    brow_dist = dist(brow_pt, eye_top_pt)
+                    
+                    l_eye_in = np.array([landmarks[L_EYE_IN].x * w, landmarks[L_EYE_IN].y * h])
+                    r_eye_in = np.array([landmarks[R_EYE_IN].x * w, landmarks[R_EYE_IN].y * h])
+                    inter_ocular = dist(l_eye_in, r_eye_in) + 1e-6
+                    brow_norm = brow_dist / inter_ocular
+                    
+                    if brow_baseline is None:
+                        brow_samples.append(brow_norm)
+                        if len(brow_samples) == brow_samples.maxlen:
+                            brow_baseline = float(np.median(brow_samples))
+                    else:
+                        brow_up = brow_norm >= (brow_baseline * (1.0 + BROW_UP_FACTOR))
+                
+                # MUTUAL EXCLUSION: If mouth is open or eyes closed, brow cannot be up
+                if mouth_open or not eyes_open:
+                    brow_up = False
+                
+                # Blink detection
                 if l_ear < BLINK_EAR_THRESH:
                     l_run += 1
                 else:
@@ -664,16 +696,17 @@ async def main_loop():
                 if is_blink and not blink_active:
                     t = time.time()
                     blink_times.append(t)
-                    if len(blink_times) >= 2:
-                        if (blink_times[-1] - blink_times[-2]) <= DOUBLE_BLINK_WINDOW:
-                            double_blink_until = t + DOUBLE_BLINK_HOLD
+                    if len(blink_times) >= 3:
+                        # Check if first and third blink are within the time window
+                        if (blink_times[-1] - blink_times[-3]) <= TRIPLE_BLINK_WINDOW:
+                            triple_blink_until = t + TRIPLE_BLINK_HOLD
                     blink_active = True
                 
                 if not is_blink and blink_active:
                     blink_active = False
                 
-                if time.time() < double_blink_until:
-                    double_blink = True
+                if time.time() < triple_blink_until:
+                    triple_blink = True
                 
                 # Update cursor if calibrated
                 if calib is not None and smoothed_yaw is not None:
@@ -682,12 +715,6 @@ async def main_loop():
                     
                     dyaw = yaw - yaw0
                     droll = roll - roll0
-                    
-                    # Use calibrated deadzones if available
-                    if "deadzone_yaw" in calib:
-                        params["deadzone_yaw"] = calib["deadzone_yaw"]
-                    if "deadzone_roll" in calib:
-                        params["deadzone_roll"] = calib["deadzone_roll"]
                     
                     # Update velocity
                     v_cmd[0], v_cmd[1] = update_velocity_constant(
@@ -714,32 +741,70 @@ async def main_loop():
                 x_percent = (cursor_x / w) * 100.0
                 y_percent = (cursor_y / h) * 100.0
                 
-                await broadcast_cursor(x_percent, y_percent)
+                await broadcast_cursor(x_percent, y_percent, mode_names[current_mode])
                 last_ws_send = current_time
             
             # Send face gesture commands when state changes
             if mouth_open != prev_mouth_open:
                 if mouth_open:
-                    await broadcast_command("mouth_open")
-                else:
-                    await broadcast_command("mouth_close")
+                    # Check if enough time has passed since last select/click
+                    if current_time - last_select_click_time >= SELECT_CLICK_COOLDOWN:
+                        x_percent = (cursor_x / w) * 100.0
+                        y_percent = (cursor_y / h) * 100.0
+                        if y_percent >= 85.0:
+                            cmd = await broadcast_command("click", x_percent, y_percent)
+                            print(f"\n[WS] {json.dumps(cmd)}")
+                        else:
+                            cmd = await broadcast_command("select", x_percent, y_percent)
+                            print(f"\n[WS] {json.dumps(cmd)}")
+                        last_select_click_time = current_time
+                    else:
+                        # Cooldown still active
+                        remaining = SELECT_CLICK_COOLDOWN - (current_time - last_select_click_time)
+                        print(f"\n[Select/Click on cooldown: {remaining:.1f}s remaining]")
                 prev_mouth_open = mouth_open
             
             if brow_up != prev_brow_up:
                 if brow_up:
-                    await broadcast_command("brow_up")
+                    # Eyebrows just went up - start timer
+                    brow_up_start_time = current_time
+                    brow_triggered = False
                 else:
-                    await broadcast_command("brow_down")
+                    # Eyebrows went down - reset timer
+                    brow_up_start_time = None
+                    brow_triggered = False
                 prev_brow_up = brow_up
             
-            if double_blink and not prev_double_blink:
-                await broadcast_command("double_blink")
-            prev_double_blink = double_blink
+            # Check if eyebrows have been held up long enough
+            if brow_up and brow_up_start_time is not None and not brow_triggered:
+                hold_duration = current_time - brow_up_start_time
+                if hold_duration >= BROW_HOLD_TIME:
+                    # Brow sends delete command
+                    x_percent = (cursor_x / w) * 100.0
+                    y_percent = (cursor_y / h) * 100.0
+                    cmd = await broadcast_command("delete", x_percent, y_percent)
+                    print(f"\n[WS] {json.dumps(cmd)}")
+                    brow_triggered = True
+            
+            if triple_blink and not prev_triple_blink:
+                # Triple blink cycles through cursor → move → stagerotate
+                current_mode = (current_mode + 1) % 3
+                x_percent = (cursor_x / w) * 100.0
+                y_percent = (cursor_y / h) * 100.0
+                cmd = await broadcast_command(mode_names[current_mode], x_percent, y_percent)
+                print(f"\n[WS] {json.dumps(cmd)}")
+            prev_triple_blink = triple_blink
             
             # Draw deadzone indicator
             cv2.circle(frame, (w//2, h//2), 60, (80, 80, 80), 2)
             cv2.putText(frame, "DEADZONE", (w//2 - 70, h//2 - 70),
                        cv2.FONT_HERSHEY_SIMPLEX, 0.7, (100, 100, 100), 2)
+            
+            # Draw click zone indicator (bottom 15%)
+            click_zone_y = int(h * 0.85)
+            cv2.line(frame, (0, click_zone_y), (w, click_zone_y), (255, 0, 255), 2)
+            cv2.putText(frame, "CLICK ZONE", (w - 200, click_zone_y - 10),
+                       cv2.FONT_HERSHEY_SIMPLEX, 0.7, (255, 0, 255), 2)
             
             # Draw CURSOR
             cursor_pos = (int(cursor_x), int(cursor_y))
@@ -754,19 +819,35 @@ async def main_loop():
                 cv2.arrowedLine(frame, cursor_pos, (end_x, end_y), 
                               (0, 255, 255), 3, tipLength=0.3)
             
-            # Draw HUD
+            # Draw HUD (top)
             hud_y = 30
             x_percent = (cursor_x / w) * 100.0
             y_percent = (cursor_y / h) * 100.0
+            in_click_zone = y_percent >= 85.0
+            cooldown_remaining = max(0, SELECT_CLICK_COOLDOWN - (current_time - last_select_click_time))
+            
+            # Determine select/click status
+            if cooldown_remaining > 0:
+                status_text = f"ON COOLDOWN ({cooldown_remaining:.1f}s)"
+            else:
+                status_text = "READY"
+            
+            if in_click_zone:
+                next_action = "CLICK"
+            else:
+                next_action = "SELECT"
+            
             hud_lines = [
                 f"FPS: {fps}",
+                f"MODE: {mode_names[current_mode]} | Click Zone: {in_click_zone}",
+                f"SELECT/CLICK: {status_text} | Next: {next_action}",
                 f"Yaw: {yaw:.1f} (d: {dyaw:+.1f})",
                 f"Roll: {roll:.1f}° (d: {droll:+.1f}°)",
                 f"Speed: {params['vmax_x']:.0f} px/s",
                 f"Deadzone: Yaw={params['deadzone_yaw']:.1f} Roll={params['deadzone_roll']:.1f}°",
                 f"Velocity: ({v_cmd[0]:+.0f}, {v_cmd[1]:+.0f}) px/s",
                 f"Cursor: ({cursor_x:.0f}, {cursor_y:.0f}) = ({x_percent:.1f}%, {y_percent:.1f}%)",
-                f"Mouth: {mouth_open} | Brow: {brow_up} | Blink2x: {double_blink}",
+                f"Mouth: {mouth_open} | Brow: {brow_up} {'(blocked)' if mouth_open and not brow_up else ''} | Blink3x: {triple_blink}",
                 f"Calib: {'YES' if calib else 'NO - Press C'} | Brow: {'SET' if brow_baseline else 'LEARNING'}",
                 f"WS Clients: {len(connected_clients)}",
             ]
@@ -811,6 +892,10 @@ async def main_loop():
                     calib = new_calib
                     smoothed_yaw = calib.get("neutral_yaw", 0)
                     smoothed_roll = calib.get("neutral_roll", 0)
+                    # Apply calibrated deadzones to params (only once after calibration)
+                    params["deadzone_yaw"] = calib.get("deadzone_yaw", DEADZONE_YAW)
+                    params["deadzone_roll"] = calib.get("deadzone_roll", DEADZONE_ROLL)
+                    print(f"[Applied calibrated deadzones: yaw={params['deadzone_yaw']:.1f} roll={params['deadzone_roll']:.1f}°]")
             elif key == ord('s'):
                 if calib:
                     with open(CALIB_FILE, 'w') as f:
@@ -827,6 +912,9 @@ async def main_loop():
                         smoothed_yaw = calib.get("neutral_yaw", 0)
                     if smoothed_roll is None:
                         smoothed_roll = calib.get("neutral_roll", 0)
+                    # Apply loaded deadzones to params
+                    params["deadzone_yaw"] = calib.get("deadzone_yaw", DEADZONE_YAW)
+                    params["deadzone_roll"] = calib.get("deadzone_roll", DEADZONE_ROLL)
             elif key == ord('r'):
                 if calib and smoothed_yaw is not None and smoothed_roll is not None:
                     calib["neutral_yaw"] = smoothed_yaw

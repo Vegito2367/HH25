@@ -13,7 +13,9 @@ venv/
 Ignore Python cache files
 pycache/
 *.pyc
+*.json
 
+simple_head_calib.json
 
 --- Exported builds ---
 Ignore builds exported from the editor for any platform.

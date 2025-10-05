@@ -20,6 +20,8 @@ def random_between(m, n):
 async def socketTest(websocket):
     print("Godot client connected!")
     try:
+        xprec=10
+        yprec=10
         while True:
             command_to_send = None
             if select.select([sys.stdin], [], [], 0)[0]:
@@ -28,10 +30,11 @@ async def socketTest(websocket):
                 y=str(random_between(100,500))
                 xper = str(random_between(0,100))
                 yper = str(random_between(0,100))
-                cubex = 35
-                buttony=85
+                cubex = 30
+                buttony=92
                 sphx=45
                 diamondx=65
+                
                 z = random_between(2,10)
                 if key_input == 'q':  # Quit
                     break
@@ -42,12 +45,47 @@ async def socketTest(websocket):
                 elif key_input == 'z':
                     command_to_send = {"command": "select"}
                 elif key_input == 'm':  # eye movement
-                    command_to_send = {"command": "cursor", "x": str(xper), "y": str(yper) }
+                    command_to_send = {"command": "cursor", "x": xprec+10, "y": yprec+10 }
+                    xprec+=10
+                    yprec+=10
+                elif key_input == 'M':  # eye movement
+                    command_to_send = {"command": "cursor", "x": yprec-10, "y": yprec-10 }
+                    xprec-=10
+                    yprec-=10
+                elif key_input=='p':
+                    command_to_send = {"command": "cursor", "x": 75, "y": 40 }
+                elif key_input=='P':
+                    command_to_send = {"command": "cursor", "x": 25, "y": 40 }
+                elif key_input == 'o':
+                    command_to_send = {"command": "stagerotate", "x": 40, "y": 75 }
+                elif key_input =='O':
+                    command_to_send = {"command": "stagerotate", "x": 40, "y": 25 }
                 elif key_input == 'n':  # eye click
                     command_to_send = {"command": "cursor", "x": str(xper), "y": str(yper) }
                     command_to_send = {"command": "click", "x": str(xper), "y": str(yper)}
                 elif key_input == 'j':  # eye click
                     command_to_send = {"command": "selectZ", "z":str(z)}
+                elif key_input == 'w':
+                    command_to_send = {"command":"move", "x":0, "y":0, "z":77}
+                elif key_input == 'W':
+                    command_to_send = {"command":"move", "x":0, "y":0, "z":25}
+                elif key_input == 'a':
+                    command_to_send = {"command":"move", "x":77, "y":0, "z":0}
+                elif key_input == 'A':
+                    command_to_send = {"command":"move", "x":25, "y":0, "z":0}
+                elif key_input == 's':
+                    command_to_send = {"command":"move", "x":0, "y":77, "z":0}
+                elif key_input == 'S':
+                    command_to_send = {"command":"move", "x":0, "y":25, "z":0}
+                elif key_input == 'r':
+                    command_to_send = {"command":"stagerotate", "x":0, "y":60}
+                elif key_input == 'R':
+                    command_to_send = {"command":"stagerotate", "x":0, "y":-60}
+                elif key_input == 'k':
+                    command_to_send = {"command":"stagerotate", "x":30, "y":0}
+                elif key_input == 'K':
+                    command_to_send = {"command":"stagerotate", "x":-30, "y":0}
+                
             if command_to_send:
                 await websocket.send(json.dumps(command_to_send))
                 print(f"Sent: {command_to_send}")           

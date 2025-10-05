@@ -6,7 +6,7 @@
 
 [sub_resource type="PlaneMesh" id="PlaneMesh_3a071"]
 
-[node name="Node3D" type="Node3D"]
+[node name="Scene" type="Node3D"]
 script = ExtResource("1_nt2sx")
 zDistance = 5.0
 
@@ -18,34 +18,78 @@ anchor_bottom = 1.0
 grow_horizontal = 2
 grow_vertical = 2
 
-[node name="Cube" type="Button" parent="CanvasLayer"]
-layout_mode = 0
-offset_left = 370.0
-offset_top = 536.0
-offset_right = 418.0
-offset_bottom = 567.0
-scale = Vector2(1.5, 1.5)
+[node name="LeftZone" type="ColorRect" parent="CanvasLayer"]
+layout_mode = 1
+anchors_preset = -1
+anchor_right = 0.2
+anchor_bottom = 1.0
+offset_right = 38.0
+offset_bottom = 6.0
+color = Color(0.996078, 0, 0, 0.176471)
+
+[node name="BottomZone" type="ColorRect" parent="CanvasLayer"]
+layout_mode = 1
+anchors_preset = -1
+anchor_top = 0.85
+anchor_right = 1.0
+anchor_bottom = 1.0
+offset_left = 1.0
+offset_top = -89.0
+offset_right = 40.0
+offset_bottom = 10.0
+color = Color(0.996078, 0, 0, 0.176471)
+
+[node name="TopZone" type="ColorRect" parent="CanvasLayer"]
+layout_mode = 1
+anchors_preset = -1
+anchor_right = 1.0
+anchor_bottom = 0.2
+offset_right = 40.0
+offset_bottom = 40.0
+color = Color(0.384314, 1, 0, 0.176471)
+
+[node name="RightZone" type="ColorRect" parent="CanvasLayer"]
+layout_mode = 1
+anchors_preset = -1
+anchor_left = 0.8
+anchor_right = 1.0
+anchor_bottom = 1.0
+offset_right = 40.0
+offset_bottom = -1.0
+color = Color(0, 1, 0, 0.184314)
+
+[node name="MarginContainer" type="MarginContainer" parent="CanvasLayer"]
+layout_mode = 1
+anchors_preset = 7
+anchor_left = 0.5
+anchor_top = 1.0
+anchor_right = 0.5
+anchor_bottom = 1.0
+offset_left = -430.0
+offset_top = -101.0
+offset_right = -40.0
+offset_bottom = -68.0
+grow_horizontal = 2
+grow_vertical = 0
+scale = Vector2(3, 3)
+theme_override_constants/margin_bottom = 0
+
+[node name="HBoxContainer" type="HBoxContainer" parent="CanvasLayer/MarginContainer"]
+layout_mode = 2
+theme_override_constants/separation = 100
+alignment = 1
+
+[node name="Cube" type="Button" parent="CanvasLayer/MarginContainer/HBoxContainer"]
+layout_mode = 2
 text = "Cube"
 
-[node name="Sphere" type="Button" parent="CanvasLayer"]
-layout_mode = 0
-offset_left = 506.0
-offset_top = 536.0
-offset_right = 569.0
-offset_bottom = 567.0
-scale = Vector2(1.5, 1.5)
-text = "Sphere
-"
+[node name="Sphere" type="Button" parent="CanvasLayer/MarginContainer/HBoxContainer"]
+layout_mode = 2
+text = "Sphere"
 
-[node name="Diamond" type="Button" parent="CanvasLayer"]
-layout_mode = 0
-offset_left = 652.0
-offset_top = 536.0
-offset_right = 731.0
-offset_bottom = 567.0
-scale = Vector2(1.5, 1.5)
-text = "Diamond
-"
+[node name="Diamond" type="Button" parent="CanvasLayer/MarginContainer/HBoxContainer"]
+layout_mode = 2
+text = "Diamond"
 
 [node name="Cursor" type="TextureRect" parent="CanvasLayer"]
 layout_mode = 0
@@ -56,6 +100,14 @@ offset_bottom = 120.0
 scale = Vector2(0.5, 0.5)
 mouse_filter = 2
 texture = SubResource("CanvasTexture_vjct1")
+
+[node name="DebugBox" type="TextEdit" parent="CanvasLayer"]
+layout_mode = 0
+offset_left = 104.0
+offset_top = 151.0
+offset_right = 304.0
+offset_bottom = 201.0
+text = "Hello World"
 
 [node name="Camera3D" type="Camera3D" parent="."]
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 0.420356, 0.39744)
@@ -69,7 +121,9 @@ sky_mode = 1
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 0, -1.2781)
 mesh = SubResource("PlaneMesh_3a071")
 
-[connection signal="button_down" from="CanvasLayer/Cube" to="." method="_on_cube_button_down"]
-[connection signal="button_down" from="CanvasLayer/Sphere" to="." method="_on_sphere_button_down"]
-[connection signal="button_down" from="CanvasLayer/Diamond" to="." method="_on_button_3_button_down"]
-[connection signal="button_down" from="CanvasLayer/Diamond" to="." method="_on_diamond_button_down"]
+[node name="Parent" type="Node3D" parent="."]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 0, -1.3886)
+
+[connection signal="button_down" from="CanvasLayer/MarginContainer/HBoxContainer/Cube" to="." method="_on_cube_button_down"]
+[connection signal="button_down" from="CanvasLayer/MarginContainer/HBoxContainer/Sphere" to="." method="_on_sphere_button_down"]
+[connection signal="button_down" from="CanvasLayer/MarginContainer/HBoxContainer/Diamond" to="." method="_on_diamond_button_down"]
