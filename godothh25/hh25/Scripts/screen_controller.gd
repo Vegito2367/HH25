@@ -12,7 +12,7 @@ const SphereScene = preload("res://Scenes/sphere.tscn")
 const CubeScene = preload("res://Scenes/cube.tscn")
 
 @onready var cursor: TextureRect = $CanvasLayer/Cursor
-
+@onready var baseParent:Node3D = $Parent
 # Get a reference to the active camera.
 @onready var camera: Camera3D = get_viewport().get_camera_3d()
 var targetPosition: Vector3
@@ -70,7 +70,7 @@ func _process(_delta):
 			killProgram()
 	
 	camera.global_position = camera.global_position.lerp(targetPosition, lerpCoeff * _delta)
-	camera.global_transform.basis = camera.global_transform.basis.slerp(targetBasis, slerpCoeff * _delta)
+	baseParent.global_transform.basis = baseParent.global_transform.basis.slerp(targetBasis, slerpCoeff * _delta)
 
 
 # This function parses the incoming message and calls the appropriate 3D action
@@ -97,7 +97,9 @@ func _handle_command(command_string: String):
 				currentShape = SphereScene.instantiate()
 			if(shape=="cube"):
 				currentShape = CubeScene.instantiate()
-			add_child(currentShape)
+			baseParent.add_child(currentShape)
+			if !(previousCommand == "insert" && currentShape.position == Vector3(0,0,10)):
+				return
 			currentShape.position = Vector3(0,0,10)
 			previousCommand = command
 			 #Dummy Position behind camera
@@ -123,6 +125,7 @@ func _handle_command(command_string: String):
 			cursor.position = screen_coords
 			if(currentShape!=null):
 				if(previousCommand=="insert"):
+					print("INSERT PART RAN")
 					currentShape.position = get_world_coords_on_camera_plane(screen_coords)
 				elif (previousCommand=="selectXY"):
 					pushObjectBack((sign(cursor.position.x - 50)*-1*zSpeed))
@@ -157,7 +160,7 @@ func _handle_command(command_string: String):
 		"stagerotate":
 			var rx: float = float(parsed_json.get("x",0.0)) * PI/180
 			var ry: float = float(parsed_json.get("y",0.0)) * PI/180
-			var current_roll = camera.global_transform.basis.get_euler()
+			var current_roll = baseParent.global_transform.basis.get_euler()
 			var target_euler = Vector3(current_roll.x+rx, current_roll.y + ry, current_roll.z)
 			targetBasis = Basis.from_euler(target_euler)
 		_:

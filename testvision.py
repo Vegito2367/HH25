@@ -30,8 +30,8 @@ async def socketTest(websocket):
                 y=str(random_between(100,500))
                 xper = str(random_between(0,100))
                 yper = str(random_between(0,100))
-                cubex = 35
-                buttony=85
+                cubex = 30
+                buttony=92
                 sphx=45
                 diamondx=65
                 
