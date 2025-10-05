@@ -117,7 +117,7 @@ export default function RequestsPage() {
           {user && (
             <button
               onClick={() => setShowForm(!showForm)}
-              className="bg-green-600 text-white px-4 py-2 rounded-md hover:bg-green-700 transition-colors flex items-center"
+              className="bg-primary text-primary-foreground px-4 py-2 rounded-md hover:bg-primary/90 transition-colors flex items-center"
             >
               <Plus className="h-5 w-5 mr-2" />
               Post Request
@@ -145,7 +145,7 @@ export default function RequestsPage() {
                     required
                     value={formData.title}
                     onChange={handleInputChange}
-                    className="block w-full pl-10 pr-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-green-500 focus:border-green-500"
+                    className="block w-full pl-10 pr-3 py-2 border border-input rounded-md focus:outline-none focus:ring-ring focus:border-ring"
                     placeholder="e.g., Need a website for my business"
                   />
                 </div>
@@ -162,7 +162,7 @@ export default function RequestsPage() {
                   rows={4}
                   value={formData.description}
                   onChange={handleInputChange}
-                  className="block w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-green-500 focus:border-green-500"
+                  className="block w-full px-3 py-2 border border-input rounded-md focus:outline-none focus:ring-ring focus:border-ring"
                   placeholder="Describe your project requirements..."
                 />
               </div>
@@ -184,7 +184,7 @@ export default function RequestsPage() {
                     step="0.01"
                     value={formData.budget}
                     onChange={handleInputChange}
-                    className="block w-full pl-10 pr-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-green-500 focus:border-green-500"
+                    className="block w-full pl-10 pr-3 py-2 border border-input rounded-md focus:outline-none focus:ring-ring focus:border-ring"
                     placeholder="500.00"
                   />
                 </div>
@@ -197,7 +197,7 @@ export default function RequestsPage() {
               )}
 
               {success && (
-                <div className="bg-green-50 border border-green-200 text-green-600 px-4 py-3 rounded-md text-sm">
+                <div className="bg-primary/10 border border-primary/20 text-primary px-4 py-3 rounded-md text-sm">
                   {success}
                 </div>
               )}
@@ -213,7 +213,7 @@ export default function RequestsPage() {
                 <button
                   type="submit"
                   disabled={submitting}
-                  className="px-4 py-2 bg-green-600 text-white rounded-md hover:bg-green-700 disabled:opacity-50"
+                  className="px-4 py-2 bg-primary text-primary-foreground rounded-md hover:bg-primary/90 disabled:opacity-50"
                 >
                   {submitting ? 'Posting...' : 'Post Request'}
                 </button>
@@ -238,7 +238,7 @@ export default function RequestsPage() {
                   <h3 className="text-xl font-semibold text-gray-900 line-clamp-2">
                     {request.title}
                   </h3>
-                  <span className="text-2xl font-bold text-green-600 ml-2">
+                  <span className="text-2xl font-bold text-primary ml-2">
                     ${request.budget}
                   </span>
                 </div>
@@ -259,7 +259,7 @@ export default function RequestsPage() {
                 </div>
 
                 <div className="mt-4">
-                  <button className="w-full bg-green-600 text-white px-4 py-2 rounded-md text-sm font-medium hover:bg-green-700 transition-colors">
+                  <button className="w-full bg-primary text-primary-foreground px-4 py-2 rounded-md text-sm font-medium hover:bg-primary/90 transition-colors">
                     Apply for this Project
                   </button>
                 </div>

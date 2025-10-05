@@ -1,6 +1,6 @@
 'use client'
 
-import { useState } from 'react'
+import { useState, useEffect } from 'react'
 
 interface ModelViewerProps {
   glbUrl?: string
@@ -9,7 +9,26 @@ interface ModelViewerProps {
 }
 
 export default function ModelViewer({ glbUrl, imageUrl, className = "w-full h-64" }: ModelViewerProps) {
-  const [isLoading, setIsLoading] = useState(false)
+  const [isLoading, setIsLoading] = useState(true)
+  const [hasError, setHasError] = useState(false)
+
+  useEffect(() => {
+    // Load model-viewer script if not already loaded
+    if (glbUrl && typeof window !== 'undefined') {
+      const script = document.createElement('script')
+      script.type = 'module'
+      script.src = 'https://unpkg.com/@google/model-viewer/dist/model-viewer.min.js'
+      script.onload = () => setIsLoading(false)
+      script.onerror = () => setHasError(true)
+      
+      // Check if script is already loaded
+      if (!document.querySelector('script[src*="model-viewer"]')) {
+        document.head.appendChild(script)
+      } else {
+        setIsLoading(false)
+      }
+    }
+  }, [glbUrl])
 
   if (!glbUrl) {
     // Fallback to image if no GLB file
@@ -33,65 +52,59 @@ export default function ModelViewer({ glbUrl, imageUrl, className = "w-full h-64
     )
   }
 
-  const handleViewModel = () => {
-    setIsLoading(true)
-    // Open GLB file in new tab
-    window.open(glbUrl, '_blank')
-    setTimeout(() => setIsLoading(false), 1000)
+  if (hasError) {
+    return (
+      <div className={`${className} bg-red-50 rounded-lg overflow-hidden flex items-center justify-center`}>
+        <div className="text-center p-4">
+          <div className="text-red-500 text-4xl mb-2">⚠️</div>
+          <div className="text-sm text-red-700 mb-2">Failed to load 3D model</div>
+          <button 
+            onClick={() => setHasError(false)}
+            className="text-xs bg-red-100 text-red-700 px-2 py-1 rounded hover:bg-red-200"
+          >
+            Retry
+          </button>
+        </div>
+      </div>
+    )
   }
 
   return (
-    <div className={`${className} bg-gradient-to-br from-blue-50 to-purple-50 rounded-lg overflow-hidden relative group cursor-pointer`} onClick={handleViewModel}>
-      {/* 3D Model Preview Area */}
-      <div className="w-full h-full flex flex-col items-center justify-center p-4">
-        {/* 3D Icon with Animation */}
-        <div className="text-6xl mb-4 transform group-hover:scale-110 transition-transform duration-300">
-          <div className="relative">
-            <div className="absolute inset-0 bg-gradient-to-r from-blue-400 to-purple-500 rounded-full opacity-20 blur-lg"></div>
-            <div className="relative text-blue-600">🎨</div>
+    <div className={`${className} bg-gray-100 rounded-lg overflow-hidden relative group`}>
+      {isLoading ? (
+        <div className="w-full h-full flex items-center justify-center bg-gray-100 rounded-lg">
+          <div className="text-center">
+            <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-600 mx-auto mb-2"></div>
+            <div className="text-sm text-gray-600">Loading 3D Model...</div>
           </div>
         </div>
-        
-        {/* Model Info */}
-        <div className="text-center mb-4">
-          <div className="text-lg font-semibold text-gray-700 mb-1">3D Model Ready</div>
-          <div className="text-sm text-gray-500 mb-2">GLB File Available</div>
-          <div className="text-xs text-gray-400 font-mono bg-white/50 px-2 py-1 rounded">
-            {glbUrl.split('/').pop()}
+      ) : (
+        <>
+          <model-viewer
+            src={glbUrl}
+            alt="3D Model"
+            auto-rotate
+            camera-controls
+            touch-action="pan-y"
+            style={{
+              width: '100%',
+              height: '100%',
+              backgroundColor: '#f3f4f6'
+            }}
+            onError={() => setHasError(true)}
+          />
+          
+          {/* 3D Badge */}
+          <div className="absolute top-2 right-2 bg-primary text-primary-foreground text-xs px-2 py-1 rounded-full font-medium shadow-lg z-10">
+            3D
           </div>
-        </div>
-
-        {/* Interactive Button */}
-        <div className="relative">
-          <div className="absolute inset-0 bg-blue-600 rounded-lg blur-sm opacity-50 group-hover:opacity-75 transition-opacity"></div>
-          <button 
-            className={`relative bg-blue-600 text-white px-6 py-3 rounded-lg text-sm font-medium hover:bg-blue-700 transition-all duration-200 transform group-hover:scale-105 ${
-              isLoading ? 'opacity-50 cursor-not-allowed' : ''
-            }`}
-            disabled={isLoading}
-          >
-            {isLoading ? (
-              <div className="flex items-center">
-                <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-white mr-2"></div>
-                Opening...
-              </div>
-            ) : (
-              <div className="flex items-center">
-                <span className="mr-2">👁️</span>
-                View 3D Model
-              </div>
-            )}
-          </button>
-        </div>
-
-        {/* Hover Effect */}
-        <div className="absolute inset-0 bg-gradient-to-t from-black/10 to-transparent opacity-0 group-hover:opacity-100 transition-opacity duration-300"></div>
-        
-        {/* Corner Badge */}
-        <div className="absolute top-2 right-2 bg-green-500 text-white text-xs px-2 py-1 rounded-full font-medium">
-          3D
-        </div>
-      </div>
+          
+          {/* Interactive Hint */}
+          <div className="absolute bottom-2 left-2 bg-black/50 text-white text-xs px-2 py-1 rounded opacity-0 group-hover:opacity-100 transition-opacity z-10">
+            Drag to rotate • Scroll to zoom
+          </div>
+        </>
+      )}
     </div>
   )
 }
