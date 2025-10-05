@@ -24,7 +24,7 @@ YAW_SMOOTHING = 0.3     # Smoothing factor for yaw (0-1, higher = more smoothing
 # Face gesture detection config
 BROW_BASELINE_FRAMES = 60   # frames to learn neutral brow distance
 BROW_UP_FACTOR = 0.20       # increased: requires more eyebrow movement to trigger
-BROW_HOLD_TIME = 0.66       # seconds eyebrows must be held up to trigger
+BROW_HOLD_TIME = 0.33       # seconds eyebrows must be held up to trigger
 MOUTH_OPEN_THRESH = 0.38    # mouth-aspect-ratio threshold for open/close
 BLINK_EAR_THRESH = 0.22     # raised a bit so blinks register sooner
 BLINK_MIN_FRAMES = 1        # count blink if eyes closed for >= 1 frame
