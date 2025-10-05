@@ -1,6 +1,9 @@
-[gd_scene load_steps=2 format=3 uid="uid://d2a1pdn2oeq4a"]
+[gd_scene load_steps=3 format=3 uid="uid://d2a1pdn2oeq4a"]
+
+[sub_resource type="StandardMaterial3D" id="StandardMaterial3D_cxj8w"]
 
 [sub_resource type="SphereMesh" id="SphereMesh_ijsy1"]
+material = SubResource("StandardMaterial3D_cxj8w")
 
 [node name="Sphere" type="Node3D"]
 

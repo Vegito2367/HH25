@@ -1,0 +1,11 @@
+[gd_scene load_steps=3 format=3 uid="uid://fgjlhoransvr"]
+
+[sub_resource type="StandardMaterial3D" id="StandardMaterial3D_cyey5"]
+
+[sub_resource type="PrismMesh" id="PrismMesh_rpi28"]
+material = SubResource("StandardMaterial3D_cyey5")
+
+[node name="Diamond" type="Node3D"]
+
+[node name="MeshInstance3D" type="MeshInstance3D" parent="."]
+mesh = SubResource("PrismMesh_rpi28")

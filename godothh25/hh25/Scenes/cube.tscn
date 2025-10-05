@@ -1,6 +1,9 @@
-[gd_scene load_steps=2 format=3 uid="uid://b0xv1xdj2r648"]
+[gd_scene load_steps=3 format=3 uid="uid://b0xv1xdj2r648"]
+
+[sub_resource type="StandardMaterial3D" id="StandardMaterial3D_fptt1"]
 
 [sub_resource type="BoxMesh" id="BoxMesh_2fwu3"]
+material = SubResource("StandardMaterial3D_fptt1")
 
 [node name="Cube" type="Node3D"]
 
