@@ -6,7 +6,7 @@
 
 [sub_resource type="PlaneMesh" id="PlaneMesh_3a071"]
 
-[node name="Node3D" type="Node3D"]
+[node name="Scene" type="Node3D"]
 script = ExtResource("1_nt2sx")
 zDistance = 5.0
 
@@ -71,3 +71,10 @@ sky_mode = 1
 [node name="MeshInstance3D" type="MeshInstance3D" parent="."]
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 0, -1.2781)
 mesh = SubResource("PlaneMesh_3a071")
+
+[node name="Parent" type="Node3D" parent="."]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 0, -1.3886)
+
+[connection signal="button_down" from="CanvasLayer/MarginContainer/HBoxContainer/Cube" to="." method="_on_cube_button_down"]
+[connection signal="button_down" from="CanvasLayer/MarginContainer/HBoxContainer/Sphere" to="." method="_on_sphere_button_down"]
+[connection signal="button_down" from="CanvasLayer/MarginContainer/HBoxContainer/Diamond" to="." method="_on_diamond_button_down"]

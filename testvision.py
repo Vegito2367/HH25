@@ -30,8 +30,8 @@ async def socketTest(websocket):
                 y=str(random_between(100,500))
                 xper = str(random_between(0,100))
                 yper = str(random_between(0,100))
-                cubex = 35
-                buttony=85
+                cubex = 30
+                buttony=92
                 sphx=45
                 diamondx=65
                 
@@ -65,10 +65,22 @@ async def socketTest(websocket):
                     command_to_send = {"command":"move", "x":0, "y":0, "z":1}
                 elif key_input == 'W':
                     command_to_send = {"command":"move", "x":0, "y":0, "z":-1}
+                elif key_input == 'a':
+                    command_to_send = {"command":"move", "x":1, "y":0, "z":0}
+                elif key_input == 'A':
+                    command_to_send = {"command":"move", "x":-1, "y":0, "z":0}
+                elif key_input == 's':
+                    command_to_send = {"command":"move", "x":0, "y":1, "z":0}
+                elif key_input == 'S':
+                    command_to_send = {"command":"move", "x":0, "y":-1, "z":0}
                 elif key_input == 'r':
                     command_to_send = {"command":"stagerotate", "x":0, "y":60}
                 elif key_input == 'R':
                     command_to_send = {"command":"stagerotate", "x":0, "y":-60}
+                elif key_input == 'k':
+                    command_to_send = {"command":"stagerotate", "x":30, "y":0}
+                elif key_input == 'K':
+                    command_to_send = {"command":"stagerotate", "x":-30, "y":0}
                 
             if command_to_send:
                 await websocket.send(json.dumps(command_to_send))

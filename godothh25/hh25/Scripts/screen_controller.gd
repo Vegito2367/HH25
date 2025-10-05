@@ -12,7 +12,7 @@ const SphereScene = preload("res://Scenes/sphere.tscn")
 const CubeScene = preload("res://Scenes/cube.tscn")
 
 @onready var cursor: TextureRect = $CanvasLayer/Cursor
-
+@onready var baseParent:Node3D = $Parent
 # Get a reference to the active camera.
 @onready var camera: Camera3D = get_viewport().get_camera_3d()
 var targetPosition: Vector3
@@ -30,7 +30,7 @@ var _is_connected = false
 var MOUTHMODE:bool = true 
 # The address of the Python server
 var server_url = "ws://localhost:8765"
-
+@export var nodesList:Array[Node3D]
 func _ready():
 	print("Attempting to connect to vision server...")
 	# Attempt to connect to the WebSocket server
@@ -70,7 +70,7 @@ func _process(_delta):
 			killProgram()
 	
 	camera.global_position = camera.global_position.lerp(targetPosition, lerpCoeff * _delta)
-	camera.global_transform.basis = camera.global_transform.basis.slerp(targetBasis, slerpCoeff * _delta)
+	baseParent.global_transform.basis = baseParent.global_transform.basis.slerp(targetBasis, slerpCoeff * _delta)
 
 
 # This function parses the incoming message and calls the appropriate 3D action
@@ -89,7 +89,8 @@ func _handle_command(command_string: String):
 	print("COM RUN:",command)
 	match command:
 		"insert":
-			checkCommandCompatibility(command)
+			if !checkCommandCompatibility(command):
+				return
 			var shape: String = parsed_json.get("shape", "none")
 			if(currentShape!=null && previousCommand=="insert"):
 				remove_child(currentShape)
@@ -97,21 +98,27 @@ func _handle_command(command_string: String):
 				currentShape = SphereScene.instantiate()
 			if(shape=="cube"):
 				currentShape = CubeScene.instantiate()
-			add_child(currentShape)
-			currentShape.position = Vector3(0,0,10)
+			
+			if (previousCommand == "insert" && currentShape.position == Vector3(0,0,10)):
+				return
+			baseParent.add_child(currentShape)
+			currentShape.global_position= Vector3(0,0,10)
 			previousCommand = command
 			 #Dummy Position behind camera
 		"selectXY":
-			checkCommandCompatibility(command)
+			if !checkCommandCompatibility(command):
+				return
 			var screen_coords = cursor.position
 			var world_coords = get_world_coords_on_camera_plane(screen_coords)
-			currentShape.position = world_coords
+			currentShape.global_position= world_coords
 			previousCommand = command
 		
 		"selectZ":
-			checkCommandCompatibility(command)
+			if !checkCommandCompatibility(command):
+				return
 			var z:float = float(parsed_json.get("z", "0.0"))
 			pushObjectBack(z)
+			nodesList.append(currentShape)
 			currentShape=null
 			previousCommand = command
 		
@@ -121,9 +128,10 @@ func _handle_command(command_string: String):
 			var currentViewport = get_viewport().size
 			var screen_coords = Vector2(currentViewport.x * xper, currentViewport.y * yper)
 			cursor.position = screen_coords
-			if(currentShape!=null):
+			if(currentShape!=null && cursor.position.y>17):
 				if(previousCommand=="insert"):
-					currentShape.position = get_world_coords_on_camera_plane(screen_coords)
+					print("INSERT PART RAN")
+					currentShape.global_position = get_world_coords_on_camera_plane(screen_coords)
 				elif (previousCommand=="selectXY"):
 					pushObjectBack((sign(cursor.position.x - 50)*-1*zSpeed))
 		"select":
@@ -157,7 +165,7 @@ func _handle_command(command_string: String):
 		"stagerotate":
 			var rx: float = float(parsed_json.get("x",0.0)) * PI/180
 			var ry: float = float(parsed_json.get("y",0.0)) * PI/180
-			var current_roll = camera.global_transform.basis.get_euler()
+			var current_roll = baseParent.global_transform.basis.get_euler()
 			var target_euler = Vector3(current_roll.x+rx, current_roll.y + ry, current_roll.z)
 			targetBasis = Basis.from_euler(target_euler)
 		_:
@@ -169,17 +177,20 @@ func checkCommandCompatibility(command: String):
 	match command:
 		"insert":
 			if !(previousCommand in ["","insert","selectZ"]): 
-						print("ERROR: INCOMPATIBLE SEQUENCE OF COMMANDS")
-						killProgram()
+				print("ERROR: INCOMPATIBLE SEQUENCE OF COMMANDS")
+				return false
 		"selectXY":
 			if !(previousCommand in ["","insert","selectXY"]): 
-						print("ERROR: INCOMPATIBLE SEQUENCE OF COMMANDS")
-						killProgram()
-		"selectZ": if!(previousCommand in ["selectXY", "selectZ"]): 
-						print("ERROR: INCOMPATIBLE SEQUENCE OF COMMANDS")
-						killProgram()
+				print("ERROR: INCOMPATIBLE SEQUENCE OF COMMANDS")
+				return false
+		"selectZ": 
+			if!(previousCommand in ["selectXY", "selectZ"]): 
+				print("ERROR: INCOMPATIBLE SEQUENCE OF COMMANDS")
+				return false
 		_:
 			pass
+	return true
+	
 	
 func shapeNullCheck():
 	if (nextShape!=null):
@@ -189,14 +200,12 @@ func killProgram():
 	get_tree().quit()
 	
 func pushObjectBack(z:float):
-	print("PREVIOUS POSITION:", currentShape.position)
-	var prevpos = currentShape.position
+	print("PREVIOUS POSITION:", currentShape.global_position)
+	var prevpos = currentShape.global_position
 	var zDirectionFromCamera = camera.global_transform.basis.z
-	var yDirectionFromCamera = camera.global_transform.basis.y
-	var xDirectionFromCamera = camera.global_transform.basis.x
-	currentShape.position += (zDirectionFromCamera) * z
-	print("UPDATED POSITION:",currentShape.position)
-	print("VECTOR:", currentShape.position-prevpos)
+	currentShape.global_position += (zDirectionFromCamera) * z
+	print("UPDATED POSITION:",currentShape.global_position)
+	print("VECTOR:", currentShape.global_position-prevpos)
 
 func get_world_coords_on_z0_plane(screen_pos: Vector2) -> Vector3:
 	# Ensure the camera is available.
