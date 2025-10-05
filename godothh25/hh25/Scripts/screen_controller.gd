@@ -27,6 +27,7 @@ var previousCommand:String=""
 @export var zSpeed: float = 0.02
 @export var rotateSpeed: float = 0.02
 @export var moveSpeed: float = 0.02
+var originalPosition:Vector3
 # WebSocket client instance
 var _ws_client = WebSocketPeer.new()
 var _is_connected = false
@@ -38,6 +39,7 @@ func _ready():
 	# Attempt to connect to the WebSocket server
 	targetPosition = camera.position
 	targetBasis = camera.global_transform.basis
+	originalPosition = camera.global_position
 	var err = _ws_client.connect_to_url(server_url)
 	if err != OK:
 		print("Error connecting to server.")
@@ -127,6 +129,7 @@ func _handle_command(command_string: String):
 			previousCommand = command
 		
 		"cursor":
+			debugBox.text="Cursor"
 			var xper:float = float(parsed_json.get("x", "0.0"))/100
 			var yper:float = float(parsed_json.get("y", "0.0"))/100
 			var currentViewport = get_viewport().size
@@ -160,19 +163,21 @@ func _handle_command(command_string: String):
 			cursor.position = screen_coords
 			simulate_click(screen_coords)
 		"move":
+
 			var mx: float = float(parsed_json.get("x",0.0))
 			var my: float = float(parsed_json.get("y",0.0))
 			var currentViewport = get_viewport().size
-			var screen_coords = Vector2(currentViewport.x * mx, currentViewport.y * my)
+			var screen_coords = Vector2(currentViewport.x * mx, currentViewport.y * my) *0.01
+			debugBox.text = str(screen_coords)
 			cursor.position = screen_coords
 			var mz: float = float(parsed_json.get("z",0.0))
 			var xv = getSign(mx) * moveSpeed
 			var yv = getSign(my) * moveSpeed
-			var zv = getSign(mz) * moveSpeed
+			var zv = 0 * moveSpeed
 			var directionZ = -camera.global_transform.basis.z
 			var directionY = -camera.global_transform.basis.y
-			var directionX = -camera.global_transform.basis.x
-			targetPosition += directionZ*zv + directionY*yv + directionX*xv
+			var directionX = camera.global_transform.basis.x
+			targetPosition += directionY*yv + directionX*xv
 		"stagerotate":
 			var rx: float = float(parsed_json.get("x",0.0)) 
 			var ry: float = float(parsed_json.get("y",0.0))
@@ -217,7 +222,6 @@ func killProgram():
 	get_tree().quit()
 
 func getSign(val:float):
-	print("WHAT THE FUCK IS THIS SIGN:",val)
 	if(val>75):
 		return 1
 	elif val<25:
@@ -225,20 +229,17 @@ func getSign(val:float):
 	else:
 		return 0
 func pushObjectBack(z:float):
-	print("PREVIOUS POSITION:", currentShape.global_position)
 	var prevpos = currentShape.global_position
 	var zDirectionFromCamera = camera.global_transform.basis.z
 	currentShape.global_position += (zDirectionFromCamera) * z
-	print("UPDATED POSITION:",currentShape.global_position)
-	print("VECTOR:", currentShape.global_position-prevpos)
 
 func get_world_coords_on_z0_plane(screen_pos: Vector2) -> Vector3:
 	# Ensure the camera is available.
 	if not camera:
 		return Vector3.ZERO
 
-	# 1. Define the target plane where Z is always 0.
-	# The normal vector (0, 0, 1) is perpendicular to this plane.
+
+
 	var target_plane = Plane(Vector3.FORWARD, zDistance)
 	print(target_plane)
 	# 2. Get the ray's origin and direction from the camera.
