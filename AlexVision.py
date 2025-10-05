@@ -28,7 +28,7 @@ BROW_HOLD_TIME = 0.65       # seconds eyebrows must be held up to trigger delete
 MOUTH_OPEN_THRESH = 0.38    # mouth-aspect-ratio threshold for open/close
 BLINK_EAR_THRESH = 0.22     # raised a bit so blinks register sooner
 BLINK_MIN_FRAMES = 1        # count blink if eyes closed for >= 1 frame
-TRIPLE_BLINK_WINDOW = 1.4   # seconds window for three blinks to cycle mode
+TRIPLE_BLINK_WINDOW = 1.0   # seconds window for three blinks to cycle mode
 TRIPLE_BLINK_HOLD = 0.2     # seconds to hold the output flag = True
 
 CALIB_FILE = "simple_head_calib.json"
