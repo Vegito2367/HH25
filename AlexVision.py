@@ -760,7 +760,7 @@ async def main_loop():
                 if brow_up:
                     # Brow cycles mode
                     current_mode = (current_mode + 1) % 3
-                    await broadcast_command(f"{mode_names[current_mode].replace('/', '_')}")
+                    await broadcast_command(f"mode_{mode_names[current_mode].replace('/', '_')}")
                     print(f"\n[Mode switched to: {mode_names[current_mode]}]")
                 # No brow_down command
                 prev_brow_up = brow_up
