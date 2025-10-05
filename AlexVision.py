@@ -24,7 +24,7 @@ YAW_SMOOTHING = 0.3     # Smoothing factor for yaw (0-1, higher = more smoothing
 # Face gesture detection config
 BROW_BASELINE_FRAMES = 60   # frames to learn neutral brow distance
 BROW_UP_FACTOR = 0.20       # increased: requires more eyebrow movement to trigger
-BROW_HOLD_TIME = 0.33       # seconds eyebrows must be held up to trigger
+BROW_HOLD_TIME = 0.80       # seconds eyebrows must be held up to trigger
 MOUTH_OPEN_THRESH = 0.38    # mouth-aspect-ratio threshold for open/close
 BLINK_EAR_THRESH = 0.22     # raised a bit so blinks register sooner
 BLINK_MIN_FRAMES = 1        # count blink if eyes closed for >= 1 frame
@@ -362,12 +362,12 @@ def update_velocity_constant(dyaw, droll, params, v_cmd_prev, dt):
     
     # X-axis (yaw) - NO LONGER INVERTED
     if abs(dyaw) > deadzone_yaw + hysteresis:
-        v_target_x = vmax_x * np.sign(dyaw)  # REMOVED NEGATIVE SIGN
+        v_target_x = vmax_x * np.sign(dyaw)
     elif abs(dyaw) < deadzone_yaw:
         v_target_x = 0.0
     else:
         if abs(v_cmd_prev[0]) > 1e-3:
-            v_target_x = vmax_x * np.sign(v_cmd_prev[0])  # REMOVED NEGATIVE SIGN
+            v_target_x = vmax_x * np.sign(v_cmd_prev[0])
     
     # Y-axis (roll)
     if abs(droll) > deadzone_roll + hysteresis:
@@ -426,14 +426,15 @@ async def broadcast_cursor(x_percent, y_percent, mode_name):
         connected_clients.discard(client)
 
 
-async def broadcast_command(command_name):
-    """Send a simple command to all connected clients."""
-    if not connected_clients:
-        return
+async def broadcast_command(command_name, x_percent, y_percent):
+    """Send a command with coordinates to all connected clients."""
+    command = {
+        "command": command_name,
+        "x": f"{x_percent:.2f}",
+        "y": f"{y_percent:.2f}"
+    }
     
-    command = {"command": command_name}
-    
-    # Send to all connected clients
+    # Send to all connected clients even if none connected (for logging)
     disconnected = set()
     for client in connected_clients:
         try:
@@ -444,6 +445,8 @@ async def broadcast_command(command_name):
     # Remove disconnected clients
     for client in disconnected:
         connected_clients.discard(client)
+    
+    return command
 
 
 async def websocket_server():
@@ -521,14 +524,14 @@ async def main_loop():
     
     # Brow hold timer
     brow_up_start_time = None
-    brow_triggered = False  # Track if we already triggered this brow raise
+    brow_triggered = False
     
     # Rate limiting for select/click commands
     last_select_click_time = 0.0
     
-    # Mode cycling: 0=cursor, 1=stagerotate
+    # Mode cycling: 0=cursor, 1=move, 2=stagerotate
     current_mode = 0
-    mode_names = ["cursor", "stagerotate"]
+    mode_names = ["cursor", "move", "stagerotate"]
     
     params = {
         "vmax_x": VMAX_X,
@@ -557,13 +560,13 @@ async def main_loop():
     print("\nFACE GESTURES:")
     print("  - Mouth open → 'select' (or 'click' if in bottom 15%)")
     print("    * Rate limited: 2 second cooldown between select/click")
-    print("  - Eyebrow raise → toggles mode (cursor ↔ stagerotate)")
-    print("  - Double blink → 'cursor' or 'click' (based on position)")
+    print("  - Eyebrow raise (hold 0.33s) → cycles mode (cursor → move → stagerotate)")
+    print("  - Double blink → 'delete' command")
     print("\nWEBSOCKET COMMANDS:")
-    print("  - cursor: continuous position updates (default mode)")
+    print("  - cursor/move/stagerotate: continuous position updates (based on mode)")
     print("  - select: mouth open outside click zone")
-    print("  - click: mouth open or double blink in click zone")
-    print("  - stagerotate: mode switched to stage rotation")
+    print("  - click: mouth open in click zone")
+    print("  - delete: double blink")
     print("\nKEYS:")
     print("  'c' - Calibrate (4 directions + neutral)")
     print("  's' / 'l' - Save / load calibration")
@@ -679,9 +682,6 @@ async def main_loop():
                     brow_up = False
                 
                 # Blink detection
-                l_ear = eye_aspect_ratio(landmarks, L_EYE_UP, L_EYE_DN, L_EYE_INNER, L_EYE_OUT, w, h)
-                r_ear = eye_aspect_ratio(landmarks, R_EYE_UP, R_EYE_DN, R_EYE_INNER, R_EYE_OUT, w, h)
-                
                 if l_ear < BLINK_EAR_THRESH:
                     l_run += 1
                 else:
@@ -748,13 +748,14 @@ async def main_loop():
                 if mouth_open:
                     # Check if enough time has passed since last select/click
                     if current_time - last_select_click_time >= SELECT_CLICK_COOLDOWN:
+                        x_percent = (cursor_x / w) * 100.0
                         y_percent = (cursor_y / h) * 100.0
                         if y_percent >= 85.0:
-                            await broadcast_command("click")
-                            print(f"\n[Click sent at y={y_percent:.1f}%]")
+                            cmd = await broadcast_command("click", x_percent, y_percent)
+                            print(f"\n[WS] {json.dumps(cmd)}")
                         else:
-                            await broadcast_command("select")
-                            print(f"\n[Select sent at y={y_percent:.1f}%]")
+                            cmd = await broadcast_command("select", x_percent, y_percent)
+                            print(f"\n[WS] {json.dumps(cmd)}")
                         last_select_click_time = current_time
                     else:
                         # Cooldown still active
@@ -764,20 +765,33 @@ async def main_loop():
             
             if brow_up != prev_brow_up:
                 if brow_up:
-                    # Brow toggles between cursor and stagerotate mode
-                    current_mode = (current_mode + 1) % 2
-                    await broadcast_command(mode_names[current_mode])
-                    print(f"\n[Mode switched to: {mode_names[current_mode]}]")
-                # No brow_down command
+                    # Eyebrows just went up - start timer
+                    brow_up_start_time = current_time
+                    brow_triggered = False
+                else:
+                    # Eyebrows went down - reset timer
+                    brow_up_start_time = None
+                    brow_triggered = False
                 prev_brow_up = brow_up
             
+            # Check if eyebrows have been held up long enough
+            if brow_up and brow_up_start_time is not None and not brow_triggered:
+                hold_duration = current_time - brow_up_start_time
+                if hold_duration >= BROW_HOLD_TIME:
+                    # Brow cycles through cursor → move → stagerotate
+                    current_mode = (current_mode + 1) % 3
+                    x_percent = (cursor_x / w) * 100.0
+                    y_percent = (cursor_y / h) * 100.0
+                    cmd = await broadcast_command(mode_names[current_mode], x_percent, y_percent)
+                    print(f"\n[WS] {json.dumps(cmd)}")
+                    brow_triggered = True
+            
             if double_blink and not prev_double_blink:
-                # Double blink sends cursor or click based on y position
+                # Double blink sends delete command
+                x_percent = (cursor_x / w) * 100.0
                 y_percent = (cursor_y / h) * 100.0
-                if y_percent >= 85.0:
-                    await broadcast_command("click")
-                else:
-                    await broadcast_command("cursor")
+                cmd = await broadcast_command("delete", x_percent, y_percent)
+                print(f"\n[WS] {json.dumps(cmd)}")
             prev_double_blink = double_blink
             
             # Draw deadzone indicator
