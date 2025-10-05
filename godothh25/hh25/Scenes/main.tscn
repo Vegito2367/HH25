@@ -1,4 +1,4 @@
-[gd_scene load_steps=10 format=3 uid="uid://2mclk04ipov8"]
+[gd_scene load_steps=11 format=3 uid="uid://2mclk04ipov8"]
 
 [ext_resource type="Script" path="res://Scripts/screen_controller.gd" id="1_nt2sx"]
 [ext_resource type="Texture2D" uid="uid://drp7axpsr7qqd" path="res://creation.png" id="2_6grp3"]
@@ -7,6 +7,7 @@
 [ext_resource type="Texture2D" uid="uid://qsffd7jnqmid" path="res://blue.webp" id="4_3twy3"]
 [ext_resource type="Texture2D" uid="uid://wb35m5pdsv4y" path="res://black.webp" id="5_d4ur0"]
 [ext_resource type="Texture2D" uid="uid://bi5tgbnwirmtt" path="res://white.webp" id="6_2ml06"]
+[ext_resource type="Script" path="res://Scripts/ExportFile.gd" id="8_pgd4x"]
 
 [sub_resource type="CanvasTexture" id="CanvasTexture_vjct1"]
 
@@ -161,6 +162,37 @@ position = Vector2(144, 119)
 scale = Vector2(0.66, 0.644)
 texture = ExtResource("2_6grp3")
 
+[node name="Control" type="Control" parent="CanvasLayer" node_paths=PackedStringArray("node_to_export", "scene_node")]
+layout_mode = 1
+anchors_preset = 3
+anchor_left = 1.0
+anchor_top = 1.0
+anchor_right = 1.0
+anchor_bottom = 1.0
+offset_left = -40.0
+offset_top = -40.0
+grow_horizontal = 0
+grow_vertical = 0
+scale = Vector2(2, 2)
+script = ExtResource("8_pgd4x")
+node_to_export = NodePath("../../Parent")
+scene_node = NodePath("../..")
+
+[node name="FileDialog" type="FileDialog" parent="CanvasLayer/Control"]
+process_mode = 3
+initial_position = 4
+size = Vector2i(303, 180)
+access = 2
+filters = PackedStringArray("*.glb ; glTF Binary")
+
+[node name="SaveFile" type="Button" parent="CanvasLayer/Control"]
+layout_mode = 0
+offset_left = -76.0
+offset_top = -24.0
+offset_right = 26.0
+offset_bottom = 7.0
+text = "Save File"
+
 [node name="Camera3D" type="Camera3D" parent="."]
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 0.420356, 0.39744)
 fov = 79.2
@@ -184,3 +216,5 @@ transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 0, -1.3886)
 [connection signal="button_down" from="CanvasLayer/ColorWheel/HBoxContainer/Blue" to="." method="_on_blue_button_down"]
 [connection signal="button_down" from="CanvasLayer/ColorWheel/HBoxContainer/Black" to="." method="_on_black_button_down"]
 [connection signal="button_down" from="CanvasLayer/ColorWheel/HBoxContainer/White" to="." method="_on_white_button_down"]
+[connection signal="file_selected" from="CanvasLayer/Control/FileDialog" to="CanvasLayer/Control" method="_on_file_dialog_file_selected"]
+[connection signal="button_down" from="CanvasLayer/Control/SaveFile" to="CanvasLayer/Control" method="_on_save_file_button_down"]
