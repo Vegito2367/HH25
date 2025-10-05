@@ -24,12 +24,12 @@ YAW_SMOOTHING = 0.3     # Smoothing factor for yaw (0-1, higher = more smoothing
 # Face gesture detection config
 BROW_BASELINE_FRAMES = 60   # frames to learn neutral brow distance
 BROW_UP_FACTOR = 0.20       # increased: requires more eyebrow movement to trigger
-BROW_HOLD_TIME = 0.65       # seconds eyebrows must be held up to trigger
+BROW_HOLD_TIME = 0.65       # seconds eyebrows must be held up to trigger delete
 MOUTH_OPEN_THRESH = 0.38    # mouth-aspect-ratio threshold for open/close
 BLINK_EAR_THRESH = 0.22     # raised a bit so blinks register sooner
 BLINK_MIN_FRAMES = 1        # count blink if eyes closed for >= 1 frame
-DOUBLE_BLINK_WINDOW = 0.6   # seconds between two blinks to count as double
-DOUBLE_BLINK_HOLD = 0.2     # seconds to hold the output flag = True
+TRIPLE_BLINK_WINDOW = 1.4   # seconds window for three blinks to cycle mode
+TRIPLE_BLINK_HOLD = 0.2     # seconds to hold the output flag = True
 
 CALIB_FILE = "simple_head_calib.json"
 
@@ -515,12 +515,12 @@ async def main_loop():
     r_run = 0
     blink_active = False
     blink_times = deque(maxlen=4)
-    double_blink_until = 0.0
+    triple_blink_until = 0.0
     
     # Previous states for edge detection
     prev_mouth_open = False
     prev_brow_up = False
-    prev_double_blink = False
+    prev_triple_blink = False
     
     # Brow hold timer
     brow_up_start_time = None
@@ -560,13 +560,13 @@ async def main_loop():
     print("\nFACE GESTURES:")
     print("  - Mouth open → 'select' (or 'click' if in bottom 15%)")
     print("    * Rate limited: 2 second cooldown between select/click")
-    print("  - Eyebrow raise (hold 0.33s) → cycles mode (cursor → move → stagerotate)")
-    print("  - Double blink → 'delete' command")
+    print("  - Triple blink (3 blinks in 1 sec) → cycles mode (cursor → move → stagerotate)")
+    print("  - Eyebrow raise (hold 0.65s) → 'delete' command")
     print("\nWEBSOCKET COMMANDS:")
     print("  - cursor/move/stagerotate: continuous position updates (based on mode)")
     print("  - select: mouth open outside click zone")
     print("  - click: mouth open in click zone")
-    print("  - delete: double blink")
+    print("  - delete: eyebrow raise (hold 0.65s)")
     print("\nKEYS:")
     print("  'c' - Calibrate (4 directions + neutral)")
     print("  's' / 'l' - Save / load calibration")
@@ -609,7 +609,7 @@ async def main_loop():
             # Face gesture states
             mouth_open = False
             brow_up = False
-            double_blink = False
+            triple_blink = False
             
             # Process face
             rgb = cv2.cvtColor(frame, cv2.COLOR_BGR2RGB)
@@ -696,16 +696,17 @@ async def main_loop():
                 if is_blink and not blink_active:
                     t = time.time()
                     blink_times.append(t)
-                    if len(blink_times) >= 2:
-                        if (blink_times[-1] - blink_times[-2]) <= DOUBLE_BLINK_WINDOW:
-                            double_blink_until = t + DOUBLE_BLINK_HOLD
+                    if len(blink_times) >= 3:
+                        # Check if first and third blink are within the time window
+                        if (blink_times[-1] - blink_times[-3]) <= TRIPLE_BLINK_WINDOW:
+                            triple_blink_until = t + TRIPLE_BLINK_HOLD
                     blink_active = True
                 
                 if not is_blink and blink_active:
                     blink_active = False
                 
-                if time.time() < double_blink_until:
-                    double_blink = True
+                if time.time() < triple_blink_until:
+                    triple_blink = True
                 
                 # Update cursor if calibrated
                 if calib is not None and smoothed_yaw is not None:
@@ -778,21 +779,21 @@ async def main_loop():
             if brow_up and brow_up_start_time is not None and not brow_triggered:
                 hold_duration = current_time - brow_up_start_time
                 if hold_duration >= BROW_HOLD_TIME:
-                    # Brow cycles through cursor → move → stagerotate
-                    current_mode = (current_mode + 1) % 3
+                    # Brow sends delete command
                     x_percent = (cursor_x / w) * 100.0
                     y_percent = (cursor_y / h) * 100.0
-                    cmd = await broadcast_command(mode_names[current_mode], x_percent, y_percent)
+                    cmd = await broadcast_command("delete", x_percent, y_percent)
                     print(f"\n[WS] {json.dumps(cmd)}")
                     brow_triggered = True
             
-            if double_blink and not prev_double_blink:
-                # Double blink sends delete command
+            if triple_blink and not prev_triple_blink:
+                # Triple blink cycles through cursor → move → stagerotate
+                current_mode = (current_mode + 1) % 3
                 x_percent = (cursor_x / w) * 100.0
                 y_percent = (cursor_y / h) * 100.0
-                cmd = await broadcast_command("delete", x_percent, y_percent)
+                cmd = await broadcast_command(mode_names[current_mode], x_percent, y_percent)
                 print(f"\n[WS] {json.dumps(cmd)}")
-            prev_double_blink = double_blink
+            prev_triple_blink = triple_blink
             
             # Draw deadzone indicator
             cv2.circle(frame, (w//2, h//2), 60, (80, 80, 80), 2)
@@ -846,7 +847,7 @@ async def main_loop():
                 f"Deadzone: Yaw={params['deadzone_yaw']:.1f} Roll={params['deadzone_roll']:.1f}°",
                 f"Velocity: ({v_cmd[0]:+.0f}, {v_cmd[1]:+.0f}) px/s",
                 f"Cursor: ({cursor_x:.0f}, {cursor_y:.0f}) = ({x_percent:.1f}%, {y_percent:.1f}%)",
-                f"Mouth: {mouth_open} | Brow: {brow_up} {'(blocked)' if mouth_open and not brow_up else ''} | Blink2x: {double_blink}",
+                f"Mouth: {mouth_open} | Brow: {brow_up} {'(blocked)' if mouth_open and not brow_up else ''} | Blink3x: {triple_blink}",
                 f"Calib: {'YES' if calib else 'NO - Press C'} | Brow: {'SET' if brow_baseline else 'LEARNING'}",
                 f"WS Clients: {len(connected_clients)}",
             ]
