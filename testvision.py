@@ -53,26 +53,30 @@ async def socketTest(websocket):
                     xprec-=10
                     yprec-=10
                 elif key_input=='p':
-                    command_to_send = {"command": "cursor", "x": 65, "y": 25 }
+                    command_to_send = {"command": "cursor", "x": 75, "y": 40 }
                 elif key_input=='P':
-                    command_to_send = {"command": "cursor", "x": -65, "y": 25 }
+                    command_to_send = {"command": "cursor", "x": 25, "y": 40 }
+                elif key_input == 'o':
+                    command_to_send = {"command": "stagerotate", "x": 40, "y": 75 }
+                elif key_input =='O':
+                    command_to_send = {"command": "stagerotate", "x": 40, "y": 25 }
                 elif key_input == 'n':  # eye click
                     command_to_send = {"command": "cursor", "x": str(xper), "y": str(yper) }
                     command_to_send = {"command": "click", "x": str(xper), "y": str(yper)}
                 elif key_input == 'j':  # eye click
                     command_to_send = {"command": "selectZ", "z":str(z)}
                 elif key_input == 'w':
-                    command_to_send = {"command":"move", "x":0, "y":0, "z":1}
+                    command_to_send = {"command":"move", "x":0, "y":0, "z":77}
                 elif key_input == 'W':
-                    command_to_send = {"command":"move", "x":0, "y":0, "z":-1}
+                    command_to_send = {"command":"move", "x":0, "y":0, "z":25}
                 elif key_input == 'a':
-                    command_to_send = {"command":"move", "x":1, "y":0, "z":0}
+                    command_to_send = {"command":"move", "x":77, "y":0, "z":0}
                 elif key_input == 'A':
-                    command_to_send = {"command":"move", "x":-1, "y":0, "z":0}
+                    command_to_send = {"command":"move", "x":25, "y":0, "z":0}
                 elif key_input == 's':
-                    command_to_send = {"command":"move", "x":0, "y":1, "z":0}
+                    command_to_send = {"command":"move", "x":0, "y":77, "z":0}
                 elif key_input == 'S':
-                    command_to_send = {"command":"move", "x":0, "y":-1, "z":0}
+                    command_to_send = {"command":"move", "x":0, "y":25, "z":0}
                 elif key_input == 'r':
                     command_to_send = {"command":"stagerotate", "x":0, "y":60}
                 elif key_input == 'R':

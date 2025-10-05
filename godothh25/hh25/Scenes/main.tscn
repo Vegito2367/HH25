@@ -18,16 +18,6 @@ anchor_bottom = 1.0
 grow_horizontal = 2
 grow_vertical = 2
 
-[node name="Cursor" type="TextureRect" parent="CanvasLayer"]
-layout_mode = 0
-offset_left = 100.0
-offset_top = 72.0
-offset_right = 146.0
-offset_bottom = 120.0
-scale = Vector2(0.5, 0.5)
-mouse_filter = 2
-texture = SubResource("CanvasTexture_vjct1")
-
 [node name="MarginContainer" type="MarginContainer" parent="CanvasLayer"]
 layout_mode = 1
 anchors_preset = 7
@@ -38,10 +28,11 @@ anchor_bottom = 1.0
 offset_left = -430.0
 offset_top = -101.0
 offset_right = -40.0
+offset_bottom = -68.0
 grow_horizontal = 2
 grow_vertical = 0
-scale = Vector2(2, 2)
-theme_override_constants/margin_bottom = 70
+scale = Vector2(3, 3)
+theme_override_constants/margin_bottom = 0
 
 [node name="HBoxContainer" type="HBoxContainer" parent="CanvasLayer/MarginContainer"]
 layout_mode = 2
@@ -59,6 +50,24 @@ text = "Sphere"
 [node name="Diamond" type="Button" parent="CanvasLayer/MarginContainer/HBoxContainer"]
 layout_mode = 2
 text = "Diamond"
+
+[node name="Cursor" type="TextureRect" parent="CanvasLayer"]
+layout_mode = 0
+offset_left = 100.0
+offset_top = 72.0
+offset_right = 146.0
+offset_bottom = 120.0
+scale = Vector2(0.5, 0.5)
+mouse_filter = 2
+texture = SubResource("CanvasTexture_vjct1")
+
+[node name="DebugBox" type="TextEdit" parent="CanvasLayer"]
+layout_mode = 0
+offset_left = 104.0
+offset_top = 151.0
+offset_right = 304.0
+offset_bottom = 201.0
+text = "Hello World"
 
 [node name="Camera3D" type="Camera3D" parent="."]
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 0.420356, 0.39744)

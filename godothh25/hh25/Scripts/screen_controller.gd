@@ -14,6 +14,7 @@ const CubeScene = preload("res://Scenes/cube.tscn")
 @onready var cursor: TextureRect = $CanvasLayer/Cursor
 @onready var baseParent:Node3D = $Parent
 # Get a reference to the active camera.
+@onready var debugBox:TextEdit = $CanvasLayer/DebugBox
 @onready var camera: Camera3D = get_viewport().get_camera_3d()
 var targetPosition: Vector3
 var targetBasis: Basis
@@ -24,10 +25,11 @@ var previousCommand:String=""
 @export var slerpCoeff = 4.0
 @export var zDistance:float=1.0
 @export var zSpeed: float = 1
+@export var rotateSpeed: float = 0.5
+@export var moveSpeed: float = 0.5
 # WebSocket client instance
 var _ws_client = WebSocketPeer.new()
 var _is_connected = false
-var MOUTHMODE:bool = true 
 # The address of the Python server
 var server_url = "ws://localhost:8765"
 @export var nodesList:Array[Node3D]
@@ -43,6 +45,8 @@ func _ready():
 		print("Connection initiated.")
 
 func _process(_delta):
+	if(currentShape!=null):
+		debugBox.text = currentShape.name
 	# We must poll the connection state
 	_ws_client.poll()
 	var state = _ws_client.get_ready_state()
@@ -130,10 +134,11 @@ func _handle_command(command_string: String):
 			cursor.position = screen_coords
 			if(currentShape!=null && cursor.position.y>17):
 				if(previousCommand=="insert"):
-					print("INSERT PART RAN")
 					currentShape.global_position = get_world_coords_on_camera_plane(screen_coords)
 				elif (previousCommand=="selectXY"):
-					pushObjectBack((sign(cursor.position.x - 50)*-1*zSpeed))
+					var signZ=getSign(xper*100)
+					print("SIGN:",signZ)
+					pushObjectBack((signZ*-1*zSpeed))
 		"select":
 			if previousCommand=="insert":
 				_handle_command(JSON.stringify({
@@ -145,7 +150,7 @@ func _handle_command(command_string: String):
 			elif previousCommand=="selectXY":
 				_handle_command(JSON.stringify({
 					"command":"selectZ",
-					"z": (sign(cursor.position.x - 50)*-1*zSpeed),
+					"z": 0,
 				}))
 		"click":
 			var xper:float = float(parsed_json.get("x", "0.0"))/100
@@ -158,15 +163,21 @@ func _handle_command(command_string: String):
 			var mx: float = float(parsed_json.get("x",0.0))
 			var my: float = float(parsed_json.get("y",0.0))
 			var mz: float = float(parsed_json.get("z",0.0))
+			var xv = getSign(mx) * moveSpeed
+			var yv = getSign(my) * moveSpeed
+			var zv = getSign(mz) * moveSpeed
 			var directionZ = -camera.global_transform.basis.z
 			var directionY = -camera.global_transform.basis.y
 			var directionX = -camera.global_transform.basis.x
-			targetPosition += directionZ*mz + directionY*my + directionX*mx
+			targetPosition += directionZ*zv + directionY*yv + directionX*xv
 		"stagerotate":
-			var rx: float = float(parsed_json.get("x",0.0)) * PI/180
-			var ry: float = float(parsed_json.get("y",0.0)) * PI/180
+			var rx: float = float(parsed_json.get("x",0.0)) 
+			var ry: float = float(parsed_json.get("y",0.0))
+			var signX=getSign(rx)
+			var signY=getSign(ry)
+			
 			var current_roll = baseParent.global_transform.basis.get_euler()
-			var target_euler = Vector3(current_roll.x+rx, current_roll.y + ry, current_roll.z)
+			var target_euler = Vector3(current_roll.x+signX*rotateSpeed, current_roll.y + signY*rotateSpeed, current_roll.z)
 			targetBasis = Basis.from_euler(target_euler)
 		_:
 			print("Received unknown command: ", command)
@@ -198,7 +209,15 @@ func shapeNullCheck():
 		killProgram()
 func killProgram():
 	get_tree().quit()
-	
+
+func getSign(val:float):
+	print("WHAT THE FUCK IS THIS SIGN:",val)
+	if(val>70):
+		return 1
+	elif val<30:
+		return -1
+	else:
+		return 0
 func pushObjectBack(z:float):
 	print("PREVIOUS POSITION:", currentShape.global_position)
 	var prevpos = currentShape.global_position
@@ -292,6 +311,7 @@ func simulate_click(screen_coords: Vector2):
 
 
 func _on_sphere_button_down() -> void:
+	print("SPHERE INSERTED click")
 	var com = JSON.stringify({
 		"command":"insert",
 		"shape": "sphere"
@@ -308,6 +328,7 @@ func _on_diamond_button_down() -> void:
 
 
 func _on_cube_button_down() -> void:
+	print("CUBE INSERTED click")
 	var com = JSON.stringify({
 		"command":"insert",
 		"shape": "cube"
