@@ -5,6 +5,7 @@ import { useRouter } from 'next/navigation'
 import { supabase } from '@/lib/supabase'
 import { User } from '@supabase/supabase-js'
 import { Upload, DollarSign, Tag, FileText, User as UserIcon, File } from 'lucide-react'
+import LookSmithNavbar from '@/components/LookSmithNavbar'
 
 const categories = [
   '3D Models',
@@ -148,15 +149,20 @@ export default function CreateListingPage() {
 
   if (loading) {
     return (
-      <div className="min-h-screen bg-gray-50 flex items-center justify-center">
-        <div className="animate-spin rounded-full h-32 w-32 border-b-2 border-primary"></div>
+      <div className="min-h-screen bg-gray-50">
+        <LookSmithNavbar />
+        <div className="pt-16 flex items-center justify-center h-screen">
+          <div className="animate-spin rounded-full h-32 w-32 border-b-2 border-primary"></div>
+        </div>
       </div>
     )
   }
 
   return (
-    <div className="min-h-screen bg-gray-50 py-8">
-      <div className="max-w-3xl mx-auto px-4 sm:px-6 lg:px-8">
+    <div className="min-h-screen bg-gray-50">
+      <LookSmithNavbar />
+      <div className="pt-16 py-8">
+        <div className="max-w-3xl mx-auto px-4 sm:px-6 lg:px-8">
         <div className="mb-8">
           <h1 className="text-3xl font-bold text-gray-900 mb-2">Create New Listing</h1>
           <p className="text-gray-600">Share your skills and start earning</p>

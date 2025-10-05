@@ -5,6 +5,7 @@ import { supabase } from '@/lib/supabase'
 import { Request } from '@/types/database'
 import { User } from '@supabase/supabase-js'
 import { Plus, DollarSign, Calendar, User as UserIcon, FileText } from 'lucide-react'
+import LookSmithNavbar from '@/components/LookSmithNavbar'
 
 export default function RequestsPage() {
   const [requests, setRequests] = useState<Request[]>([])
@@ -87,9 +88,11 @@ export default function RequestsPage() {
 
   if (loading) {
     return (
-      <div className="min-h-screen bg-gray-50 py-8">
-        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-          <div className="animate-pulse">
+      <div className="min-h-screen bg-gray-50">
+        <LookSmithNavbar />
+        <div className="pt-16 py-8">
+          <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+            <div className="animate-pulse">
             <div className="h-8 bg-gray-300 rounded w-1/4 mb-8"></div>
             <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
               {[...Array(6)].map((_, i) => (
@@ -107,8 +110,10 @@ export default function RequestsPage() {
   }
 
   return (
-    <div className="min-h-screen bg-gray-50 py-8">
-      <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+    <div className="min-h-screen bg-gray-50">
+      <LookSmithNavbar />
+      <div className="pt-16 py-8">
+        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
         <div className="flex justify-between items-center mb-8">
           <div>
             <h1 className="text-3xl font-bold text-gray-900 mb-2">Job Requests</h1>
@@ -267,6 +272,7 @@ export default function RequestsPage() {
             ))}
           </div>
         )}
+        </div>
       </div>
     </div>
   )

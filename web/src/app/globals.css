@@ -2,6 +2,49 @@
 
 @custom-variant dark (&:is(.dark *));
 
+/* Line clamp utilities */
+.line-clamp-2 {
+  display: -webkit-box;
+  -webkit-line-clamp: 2;
+  -webkit-box-orient: vertical;
+  overflow: hidden;
+}
+
+.line-clamp-3 {
+  display: -webkit-box;
+  -webkit-line-clamp: 3;
+  -webkit-box-orient: vertical;
+  overflow: hidden;
+}
+
+/* Explanation card animations */
+.explanation-card {
+  transform: translateX(-100px);
+  opacity: 0;
+}
+
+.explanation-card:hover {
+  transform: translateY(-8px);
+}
+
+/* Hero shape animations */
+.hero-shape {
+  animation: float 6s ease-in-out infinite;
+}
+
+.hero-shape:nth-child(2) {
+  animation-delay: 2s;
+}
+
+@keyframes float {
+  0%, 100% {
+    transform: translateY(0px);
+  }
+  50% {
+    transform: translateY(-20px);
+  }
+}
+
 :root {
   --background: oklch(0.9491 0.0085 197.0126);
   --foreground: oklch(0.3772 0.0619 212.6640);
