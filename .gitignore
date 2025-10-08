@@ -48,3 +48,18 @@ addons/
 
 If you have specific addons you WANT to track, un-ignore them like this:
 !addons/my_important_addon/
+*.import
+godothh25/hh25/MyNewModel.glb
+godothh25/hh25/Scripts/ExportFile.gd
+output/MyNedgsfdgwModel.glb
+output/MyNewerterterwModel.glb
+output/MyNewfdgdfsgsdfgModel.glb
+output/MyNewMefwfwefodel.glb
+output/MyNewMhgdfhdfhodel.glb
+output/MyNewModel.glb
+output/MyNewModel2.glb
+output/MyNewModfsgdfel.glb
+output/MyNewMofdhdsfhdfhdel.glb
+output/MyNewMojfjfdel.glb
+output/MyNreterterewModel.glb
+web/package-lock.json

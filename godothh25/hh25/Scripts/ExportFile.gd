@@ -48,7 +48,7 @@ func export_node_to_glb(node: Node3D, file_path: String):
 
 func _on_save_file_button_down() -> void:
 	get_tree().paused = true
-	file_dialog.current_dir = "/Users/seksierthanyou/Desktop/SideProjects/hackHarvard25"
+	file_dialog.current_dir = "/Users/alexandermcgreevy/Documents/GitHub/HH25/output"
 	file_dialog.current_file = "MyNewModel.glb"
 	file_dialog.popup_centered()
 
